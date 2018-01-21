@@ -1188,6 +1188,7 @@ struct nm_st_cb {
 	struct nm_ubuf_info ui; /* ctx keeps kring and desc keeps slot */
 #define SCB_M_MAGIC		0x12345600	/* XXX do better */
 #define SCB_M_MAGIC_MASK	0xffffff00	/* XXX do better */
+#define SCB_GONE		0x00000001
 	uint32_t flags;
 	uint32_t next;
 } __attribute__((__packed__)); /* 32 byte */
@@ -1207,6 +1208,24 @@ static inline int
 nm_st_cb_valid(struct nm_st_cb *scb)
 {
 	return ((scb->flags & SCB_M_MAGIC_MASK) == SCB_M_MAGIC);
+}
+
+static inline int
+nm_st_cb_gone(struct nm_st_cb *scb)
+{
+	return !!(scb->flags & SCB_GONE);
+}
+
+static inline void
+nm_st_cb_set_gone(struct nm_st_cb *scb)
+{
+	scb->flags |= SCB_GONE;
+}
+
+static inline void
+nm_st_cb_clr_gone(struct nm_st_cb *scb)
+{
+	scb->flags &= ~SCB_GONE;
 }
 
 static inline int

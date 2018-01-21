@@ -737,10 +737,20 @@ nm_st_extra_free(struct netmap_adapter *na)
 		for (i = 0; i < netmap_real_rings(na, t); i++) {
 			struct netmap_kring *kring = NMR(na, t)[i];
 			struct nm_st_extra_pool *extra;
+			uint32_t j;
 
 			if (!kring->extra)
 				continue;
 			extra = kring->extra;
+
+			j = extra->busy;
+			while (j != NM_EXT_NULL) {
+				struct nm_st_extra_slot *es = &extra->slots[j];
+				struct nm_st_cb *scb
+					= NMCB_BUF(NMB(na, &es->slot));
+				nm_st_cb_set_gone(scb);
+				j = es->next;
+			}
 			kring->extra = NULL;
 			extra->num = 0;
 			if (extra->slots)

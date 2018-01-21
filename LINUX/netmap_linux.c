@@ -1043,6 +1043,10 @@ nm_os_st_mbuf_data_destructor(struct ubuf_info *uarg,
 	struct nm_ubuf_info *u = (struct nm_ubuf_info *)uarg;
 
 	scb = container_of(u, struct nm_st_cb, ui);
+	if (unlikely(nm_st_cb_gone(scb))) {
+		nm_st_cb_wstate(scb, SCB_M_NOREF); // XXX also clear GONE
+		return;
+	}
 	nm_st_cb_wstate(scb, SCB_M_NOREF);
 	nm_st_extra_dequeue(scb_kring(scb), scb_slot(scb));
 }
