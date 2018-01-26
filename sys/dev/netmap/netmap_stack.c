@@ -399,7 +399,15 @@ nm_st_flush(struct netmap_kring *kring)
 				tmp.buf_idx = next;
 				scb = NMCB_BUF(NMB(na, &tmp));
 				next = scb->next;
+				if (unlikely(!nm_st_cb_valid(scb))) {
+					D("invalid scb %p next %u", scb, next);
+					goto skip;
+				}
 				ts = scb_slot(scb);
+				if (unlikely(ts == NULL)) {
+					D("null ts %p next %u", ts, next);
+					goto skip;
+				}
 				if (nm_st_cb_rstate(scb) == SCB_M_TXREF) {
 					nonfree[nonfree_num++] = j;
 				}
@@ -411,6 +419,7 @@ nm_st_flush(struct netmap_kring *kring)
 				ts->fd = 0;
 				ts->flags |= NS_BUF_CHANGED;
 				rs->flags |= NS_BUF_CHANGED;
+skip:
 				j = nm_next(j, lim_rx);
 				sent++;
 			} while (next != STACK_FT_NULL && --howmany);
