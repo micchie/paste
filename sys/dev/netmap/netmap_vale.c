@@ -209,7 +209,7 @@ struct nm_bridge {
 	/* Indexes of active ports (up to active_ports)
 	 * and all other remaining ports.
 	 */
-	uint8_t		bdg_port_index[NM_BDG_MAXPORTS];
+	uint16_t		bdg_port_index[NM_BDG_MAXPORTS];
 
 	struct netmap_vp_adapter *bdg_ports[NM_BDG_MAXPORTS];
 
@@ -454,7 +454,7 @@ netmap_bdg_detach_common(struct nm_bridge *b, int hw, int sw)
 {
 	int s_hw = hw, s_sw = sw;
 	int i, lim =b->bdg_active_ports;
-	uint8_t tmp[NM_BDG_MAXPORTS];
+	uint16_t tmp[NM_BDG_MAXPORTS];
 
 	/*
 	New algorithm:
