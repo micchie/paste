@@ -2048,6 +2048,7 @@ retry:
 						*ss = tmp;
 						slot->flags |= NS_BUF_CHANGED;
 						ss->flags |= NS_BUF_CHANGED;
+						RD(1, "zero copy");
 					}
 					else if (ft_p->ft_flags & NS_INDIRECT) {
 						if (copyin(src, dst, copy_len)) {
