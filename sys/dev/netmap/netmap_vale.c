@@ -158,10 +158,13 @@ __FBSDID("$FreeBSD: head/sys/dev/netmap/netmap.c 257176 2013-10-26 17:58:36Z gle
  * last packet in the block may overflow the size.
  */
 static int bridge_batch = NM_BDG_BATCH; /* bridge batch size */
+enum {NM_FT_NONE = 0, NM_FT_COPY, NM_FT_ZEROCOPY};
+static int bridge_ft_slot = NM_FT_NONE;
 SYSBEGIN(vars_vale);
 SYSCTL_DECL(_dev_netmap);
 SYSCTL_INT(_dev_netmap, OID_AUTO, bridge_batch, CTLFLAG_RW, &bridge_batch, 0,
     "Max batch size to be used in the bridge");
+SYSCTL_INT(_dev_netmap, OID_AUTO, bridge_ft_slot, CTLFLAG_RW, &bridge_ft_slot, 0 , "");
 SYSEND;
 
 static int netmap_vp_create(struct nmreq *, struct ifnet *,
@@ -1504,6 +1507,11 @@ nm_bdg_preflush(struct netmap_kring *kring, u_int end)
 
 		/* this slot goes into a list so initialize the link field */
 		ft[ft_i].ft_next = NM_FT_NULL;
+		if (bridge_ft_slot) {
+			buf = ft[ft_i].ft_buf = (void *)slot;
+			ft[ft_i].ft_flags |= FT_SLOT;
+			__builtin_prefetch(NMB(&na->up, slot));
+		} else {
 		buf = ft[ft_i].ft_buf = (slot->flags & NS_INDIRECT) ?
 			(void *)(uintptr_t)slot->ptr : NMB(&na->up, slot);
 		if (unlikely(buf == NULL)) {
@@ -1515,6 +1523,7 @@ nm_bdg_preflush(struct netmap_kring *kring, u_int end)
 			ft[ft_i].ft_flags = 0;
 		}
 		__builtin_prefetch(buf);
+		}
 		++ft_i;
 		if (slot->flags & NS_MOREFRAG) {
 			frags++;
@@ -1647,6 +1656,10 @@ netmap_bdg_learning(struct nm_bdg_fwd *ft, uint8_t *dst_ring,
 	u_int dst, mysrc = na->bdg_port;
 	uint64_t smac, dmac;
 	uint8_t indbuf[12];
+       if (ft->ft_flags & FT_SLOT) {
+		buf = NMB(&na->up, (struct netmap_slot *)buf);
+		//ft->ft_flags |= FT_LOG;
+	}
 
 	/* safety check, unfortunately we have many cases */
 	if (buf_len >= 14 + na->up.virt_hdr_len) {
@@ -1783,6 +1796,7 @@ nm_bdg_flush(struct nm_bdg_fwd *ft, u_int n, struct netmap_vp_adapter *na,
 	uint16_t num_dsts = 0, *dsts;
 	struct nm_bridge *b = na->na_bdg;
 	u_int i, me = na->bdg_port;
+	int zerocopy = 1;
 
 	/*
 	 * The work area (pointed by ft) is followed by an array of
@@ -1799,6 +1813,8 @@ nm_bdg_flush(struct nm_bdg_fwd *ft, u_int n, struct netmap_vp_adapter *na,
 		uint16_t dst_port, d_i;
 		struct nm_bdg_q *d;
 
+		if (!(ft[i].ft_flags & FT_SLOT))
+			zerocopy = 0;
 		ND("slot %d frags %d", i, ft[i].ft_frags);
 		/* Drop the packet if the virtio-net header is not into the first
 		   fragment nor at the very beginning of the second. */
@@ -1809,8 +1825,10 @@ nm_bdg_flush(struct nm_bdg_fwd *ft, u_int n, struct netmap_vp_adapter *na,
 			RD(5, "slot %d port %d -> %d", i, me, dst_port);
 		if (dst_port >= NM_BDG_NOPORT)
 			continue; /* this packet is identified to be dropped */
-		else if (dst_port == NM_BDG_BROADCAST)
+		else if (dst_port == NM_BDG_BROADCAST) {
+			zerocopy = 0;
 			dst_ring = 0; /* broadcasts always go to ring 0 */
+		}
 		else if (unlikely(dst_port == me ||
 		    !b->bdg_ports[dst_port]))
 			continue;
@@ -1879,6 +1897,8 @@ nm_bdg_flush(struct nm_bdg_fwd *ft, u_int n, struct netmap_vp_adapter *na,
 			goto cleanup;
 		if (dst_na->up.na_flags & NAF_SW_ONLY)
 			goto cleanup;
+		if (dst_na->up.nm_mem != na->up.nm_mem)
+			zerocopy = 0;
 		/*
 		 * The interface may be in !netmap mode in two cases:
 		 * - when na is attached but not activated yet;
@@ -2019,7 +2039,17 @@ retry:
 						RD(5, "invalid len %d, down to 64", (int)copy_len);
 						copy_len = dst_len = 64; // XXX
 					}
-					if (ft_p->ft_flags & NS_INDIRECT) {
+					if (zerocopy && ft_p->ft_flags & FT_SLOT) {
+						struct netmap_slot *ss, tmp;
+
+						ss = ft_p->ft_slot;
+						tmp = *slot;
+						*slot = *ss;
+						*ss = tmp;
+						slot->flags |= NS_BUF_CHANGED;
+						ss->flags |= NS_BUF_CHANGED;
+					}
+					else if (ft_p->ft_flags & NS_INDIRECT) {
 						if (copyin(src, dst, copy_len)) {
 							// invalid user pointer, pretend len is 0
 							dst_len = 0;
@@ -2028,13 +2058,18 @@ retry:
 						//memcpy(dst, src, copy_len);
 						pkt_copy(src, dst, (int)copy_len);
 					}
-					slot->len = dst_len;
-					slot->flags = (cnt << 8)| NS_MOREFRAG;
+					if (!(slot->flags & NS_BUF_CHANGED)) {
+						slot->len = dst_len;
+						slot->flags = (cnt << 8)| NS_MOREFRAG;
+					}
 					j = nm_next(j, lim);
 					needed--;
 					ft_p++;
 				} while (ft_p != ft_end);
-				slot->flags = (cnt << 8); /* clear flag on last entry */
+				if (!(slot->flags & NS_BUF_CHANGED))
+					slot->flags = (cnt << 8); /* clear flag on last entry */
+				else
+					slot->flags |= (cnt << 8); /* clear flag on last entry */
 			}
 			/* are we done ? */
 			if (next == NM_FT_NULL && brd_next == NM_FT_NULL)
@@ -2230,6 +2265,7 @@ netmap_vp_bdg_attach(const char *name, struct netmap_adapter *na)
 /* create a netmap_vp_adapter that describes a VALE port.
  * Only persistent VALE ports have a non-null ifp.
  */
+extern struct netmap_mem_d nm_mem;
 static int
 netmap_vp_create(struct nmreq *nmr, struct ifnet *ifp,
 		struct netmap_mem_d *nmd,
@@ -2297,10 +2333,13 @@ netmap_vp_create(struct nmreq *nmr, struct ifnet *ifp,
 	D("nr_arg2 %d", nmr->nr_arg2);
 	na->nm_mem = nmd ?
 		netmap_mem_get(nmd):
+		netmap_mem_get(&nm_mem);
+#if 0
 		netmap_mem_private_new(
 			na->num_tx_rings, na->num_tx_desc,
 			na->num_rx_rings, na->num_rx_desc,
 			nmr->nr_arg3, npipes, &error);
+#endif
 	if (na->nm_mem == NULL)
 		goto err;
 	na->nm_bdg_attach = netmap_vp_bdg_attach;
