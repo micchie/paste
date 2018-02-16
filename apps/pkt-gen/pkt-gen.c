@@ -1150,7 +1150,7 @@ send_packets(struct netmap_ring *ring, struct pkt *pkt, void *frame,
 			slot->ptr = (uint64_t)((uintptr_t)frame);
 		} else if ((options & OPT_COPY) || buf_changed) {
 			nm_pkt_copy(frame, p, size);
-			if (fcnt == nfrags)
+			if (fcnt == nfrags && !(sent % 8))
 				update_addresses(pkt, g);
 		} else if (options & OPT_MEMCPY) {
 			memcpy(p, frame, size);

@@ -1813,8 +1813,10 @@ nm_bdg_flush(struct nm_bdg_fwd *ft, u_int n, struct netmap_vp_adapter *na,
 		uint16_t dst_port, d_i;
 		struct nm_bdg_q *d;
 
-		if (!(ft[i].ft_flags & FT_SLOT))
+		if (!(ft[i].ft_flags & FT_SLOT)) {
+			RD(1, "%s no slot, disabling zero copy", b->bdg_basename);
 			zerocopy = 0;
+		}
 		ND("slot %d frags %d", i, ft[i].ft_frags);
 		/* Drop the packet if the virtio-net header is not into the first
 		   fragment nor at the very beginning of the second. */
@@ -1826,6 +1828,7 @@ nm_bdg_flush(struct nm_bdg_fwd *ft, u_int n, struct netmap_vp_adapter *na,
 		if (dst_port >= NM_BDG_NOPORT)
 			continue; /* this packet is identified to be dropped */
 		else if (dst_port == NM_BDG_BROADCAST) {
+			RD(1, "%s broadcast, disabling zero copy", b->bdg_basename);
 			zerocopy = 0;
 			dst_ring = 0; /* broadcasts always go to ring 0 */
 		}
@@ -1897,8 +1900,10 @@ nm_bdg_flush(struct nm_bdg_fwd *ft, u_int n, struct netmap_vp_adapter *na,
 			goto cleanup;
 		if (dst_na->up.na_flags & NAF_SW_ONLY)
 			goto cleanup;
-		if (dst_na->up.nm_mem != na->up.nm_mem)
+		if (dst_na->up.nm_mem != na->up.nm_mem) {
+			RD(1, "%s different allocator, disabling zero copy", b->bdg_basename);
 			zerocopy = 0;
+		}
 		/*
 		 * The interface may be in !netmap mode in two cases:
 		 * - when na is attached but not activated yet;
@@ -2048,7 +2053,7 @@ retry:
 						*ss = tmp;
 						slot->flags |= NS_BUF_CHANGED;
 						ss->flags |= NS_BUF_CHANGED;
-						RD(1, "zero copy");
+						RD(1, "%s zero copy", b->bdg_basename);
 					}
 					else if (ft_p->ft_flags & NS_INDIRECT) {
 						if (copyin(src, dst, copy_len)) {
