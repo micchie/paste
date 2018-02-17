@@ -27,6 +27,44 @@ sigint_h(int sig)
 	signal(SIGINT, SIG_DFL);
 }
 
+/* XXX cut and paste from pkt-gen.c because I'm not sure whether this
+ * program may include nm_util.h
+ */
+void parse_nmr_config(const char* conf, struct nmreq *nmr)
+{
+	char *w, *tok;
+	int i, v;
+
+	nmr->nr_tx_rings = nmr->nr_rx_rings = 0;
+	nmr->nr_tx_slots = nmr->nr_rx_slots = 0;
+	if (conf == NULL || ! *conf)
+		return;
+	w = strdup(conf);
+	for (i = 0, tok = strtok(w, ","); tok; i++, tok = strtok(NULL, ",")) {
+		v = atoi(tok);
+		switch (i) {
+		case 0:
+			nmr->nr_tx_slots = nmr->nr_rx_slots = v;
+			break;
+		case 1:
+			nmr->nr_rx_slots = v;
+			break;
+		case 2:
+			nmr->nr_tx_rings = nmr->nr_rx_rings = v;
+			break;
+		case 3:
+			nmr->nr_rx_rings = v;
+			break;
+		default:
+			D("ignored config: %s", tok);
+			break;
+		}
+	}
+	D("txr %d txd %d rxr %d rxd %d",
+			nmr->nr_tx_rings, nmr->nr_tx_slots,
+			nmr->nr_rx_rings, nmr->nr_rx_slots);
+	free(w);
+}
 
 /*
  * how many packets on this set of queues ?
@@ -66,9 +104,9 @@ process_rings(struct netmap_ring *rxring, struct netmap_ring *txring,
 	m = nm_ring_space(rxring);
 	if (m < limit)
 		limit = m;
-	m = nm_ring_space(txring);
 	if (m < limit)
 		limit = m;
+	m = nm_ring_space(txring);
 	m = limit;
 	while (limit-- > 0) {
 		struct netmap_slot *rs = &rxring->slot[j];
@@ -177,10 +215,14 @@ main(int argc, char **argv)
 	char *ifa = NULL, *ifb = NULL;
 	char ifabuf[64] = { 0 };
 	int loopback = 0;
+	struct nmreq nmr;
+	char *nmr_config;
 
 	fprintf(stderr, "%s built %s %s\n\n", argv[0], __DATE__, __TIME__);
 
-	while ((ch = getopt(argc, argv, "hb:ci:vw:L")) != -1) {
+	bzero(&nmr, sizeof(nmr));
+
+	while ((ch = getopt(argc, argv, "hb:ci:vw:LC:")) != -1) {
 		switch (ch) {
 		default:
 			D("bad option %c %s", ch, optarg);
@@ -211,6 +253,10 @@ main(int argc, char **argv)
 			break;
 		case 'L':
 			loopback = 1;
+			break;
+		case 'C':
+			nmr_config = strdup(optarg);
+			parse_nmr_config(nmr_config, &nmr);
 			break;
 		}
 
@@ -250,13 +296,13 @@ main(int argc, char **argv)
 	} else {
 		/* two different interfaces. Take all rings on if1 */
 	}
-	pa = nm_open(ifa, NULL, 0, NULL);
+	pa = nm_open(ifa, &nmr, 0, NULL);
 	if (pa == NULL) {
 		D("cannot open %s", ifa);
 		return (1);
 	}
 	/* try to reuse the mmap() of the first interface, if possible */
-	pb = nm_open(ifb, NULL, NM_OPEN_NO_MMAP, pa);
+	pb = nm_open(ifb, &nmr, NM_OPEN_NO_MMAP, pa);
 	if (pb == NULL) {
 		D("cannot open %s", ifb);
 		nm_close(pa);
