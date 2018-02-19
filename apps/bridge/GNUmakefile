@@ -1,6 +1,6 @@
 # For multiple programs using a single source file each,
 # we can just define 'progs' and create custom targets.
-PROGS	=	bridge bridge-b
+PROGS	=	bridge bridge-b bridge-p
 LIBNETMAP =
 
 CLEANFILES = $(PROGS) *.o
@@ -36,3 +36,6 @@ bridge-b: bridge-b.o
 
 bridge-b.o: bridge.c
 	$(CC) $(CFLAGS) -DBUSYWAIT -c $^ -o $@
+bridge-p: bridge-p.o
+bridge-p.o: bridge.c
+	$(CC) $(CFLAGS) -DPB -c $^ -o $@

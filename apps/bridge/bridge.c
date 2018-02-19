@@ -19,6 +19,10 @@ int verbose = 0;
 static int do_abort = 0;
 static int zerocopy = 1; /* enable zerocopy if possible */
 
+#ifdef PB
+static struct netmap_ring *qring;
+#endif
+
 static void
 sigint_h(int sig)
 {
@@ -111,6 +115,16 @@ process_rings(struct netmap_ring *rxring, struct netmap_ring *txring,
 	while (limit-- > 0) {
 		struct netmap_slot *rs = &rxring->slot[j];
 		struct netmap_slot *ts = &txring->slot[k];
+#ifdef PB
+		struct netmap_slot *qin, *qout = NULL;
+
+		qin = &qring->slot[qring->cur];
+		qring->head = qring->cur = nm_ring_next(qring, qring->cur);
+		if (!nm_ring_space(qring)) {
+			qout = &qring->slot[qring->tail];
+			qring->tail = nm_ring_next(qring, qring->tail);
+		}
+#endif /* PB */
 
 		/* swap packets */
 		if (ts->buf_idx < 2 || rs->buf_idx < 2) {
@@ -125,6 +139,27 @@ process_rings(struct netmap_ring *rxring, struct netmap_ring *txring,
 		} else if (verbose > 1) {
 			D("%s send len %d rx[%d] -> tx[%d]", msg, rs->len, j, k);
 		}
+#ifdef PB
+		{ /* XXX always zerocopy */
+			struct netmap_slot tmp;
+
+			/* enqueue */
+		       	tmp = *rs;
+			*rs = *qin;
+			*qin = tmp;
+			rs->flags |= NS_BUF_CHANGED;
+			/* dequeue */
+			if (qout) {
+				tmp = *ts;
+				*ts = *qout;
+				*qout = tmp;
+				ts->flags |= NS_BUF_CHANGED;
+			} else {
+				j = nm_ring_next(rxring, j);
+				continue;
+			}
+		}
+#else
 		ts->len = rs->len;
 		if (zerocopy) {
 			uint32_t pkt = ts->buf_idx;
@@ -138,6 +173,7 @@ process_rings(struct netmap_ring *rxring, struct netmap_ring *txring,
 			char *txbuf = NETMAP_BUF(txring, ts->buf_idx);
 			nm_pkt_copy(rxbuf, txbuf, ts->len);
 		}
+#endif /* PB */
 		j = nm_ring_next(rxring, j);
 		k = nm_ring_next(txring, k);
 	}
@@ -222,7 +258,7 @@ main(int argc, char **argv)
 
 	bzero(&nmr, sizeof(nmr));
 
-	while ((ch = getopt(argc, argv, "hb:ci:vw:LC:")) != -1) {
+	while ((ch = getopt(argc, argv, "hb:ci:vw:LC:B:")) != -1) {
 		switch (ch) {
 		default:
 			D("bad option %c %s", ch, optarg);
@@ -258,6 +294,11 @@ main(int argc, char **argv)
 			nmr_config = strdup(optarg);
 			parse_nmr_config(nmr_config, &nmr);
 			break;
+#ifdef PB
+		case 'B':
+			nmr.nr_arg3 = atoi(optarg);
+			break;
+#endif /* PB */
 		}
 
 	}
@@ -301,6 +342,33 @@ main(int argc, char **argv)
 		D("cannot open %s", ifa);
 		return (1);
 	}
+#ifdef PB
+	if (pa->nifp->ni_bufs_head) {
+		uint32_t next = pa->nifp->ni_bufs_head;
+		uint32_t i, n = pa->req.nr_arg3;
+		struct netmap_ring *any_ring = pa->some_ring;
+
+		ND("got %u extra bufs at %u", n, next);
+		qring = calloc(1, sizeof(struct netmap_ring) +
+				sizeof(struct netmap_slot) * n);
+		if (!qring) {
+			perror("calloc");
+			nm_close(pa);
+			return (1);
+		}
+		*(u_int *)(uintptr_t)&qring->num_slots = n;
+		qring->cur = qring->head = 0;
+	       	qring->tail = qring->num_slots - 1;
+		
+		for (i = 0; i < n && next; i++) {
+			char *p;
+
+			qring->slot[i].buf_idx = next;
+			p = NETMAP_BUF(any_ring, next);
+			next = *(uint32_t *)p;
+		}
+	}
+#endif /* PB */
 	/* try to reuse the mmap() of the first interface, if possible */
 	pb = nm_open(ifb, &nmr, NM_OPEN_NO_MMAP, pa);
 	if (pb == NULL) {
@@ -395,6 +463,9 @@ main(int argc, char **argv)
 	}
 	nm_close(pb);
 	nm_close(pa);
-
+#ifdef PB
+	if (qring)
+		free(qring);
+#endif
 	return (0);
 }
