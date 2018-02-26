@@ -2965,7 +2965,7 @@ main(int arc, char **argv)
 		goto out;
 	}
 	g.main_fd = g.nmd->fd;
-	D("mapped %dKB at %p", g.nmd->req.nr_memsize>>10, g.nmd->mem);
+	D("mapped %luKB at %p", g.nmd->req.nr_memsize>>10, g.nmd->mem);
 
 	if (g.virt_header) {
 		/* Set the virtio-net header length, since the user asked
@@ -2993,7 +2993,7 @@ main(int arc, char **argv)
 		struct netmap_if *nifp = g.nmd->nifp;
 		struct nmreq *req = &g.nmd->req;
 
-		D("nifp at offset %d, %d tx %d rx region %d",
+		D("nifp at offset %u, %d tx %d rx region %d",
 		    req->nr_offset, req->nr_tx_rings, req->nr_rx_rings,
 		    req->nr_arg2);
 		for (i = 0; i <= req->nr_tx_rings; i++) {

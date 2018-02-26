@@ -99,7 +99,7 @@ struct netmap_obj_pool {
 	/* these are only meaningful if the pool is finalized */
 	/* (see 'finalized' field in netmap_mem_d)            */
 	u_int objtotal;         /* actual total number of objects. */
-	u_int memtotal;		/* actual total memory space */
+	uint64_t memtotal;		/* actual total memory space */
 	u_int numclusters;	/* actual number of clusters */
 
 	u_int objfree;          /* number of free objects. */
@@ -132,7 +132,7 @@ struct netmap_obj_pool {
 
 struct netmap_mem_ops {
 	int (*nmd_get_lut)(struct netmap_mem_d *, struct netmap_lut*);
-	int  (*nmd_get_info)(struct netmap_mem_d *, u_int *size,
+	int  (*nmd_get_info)(struct netmap_mem_d *, uint64_t *size,
 			u_int *memflags, uint16_t *id);
 
 	vm_paddr_t (*nmd_ofstophys)(struct netmap_mem_d *, vm_ooffset_t);
@@ -151,7 +151,7 @@ struct netmap_mem_ops {
 
 struct netmap_mem_d {
 	NMA_LOCK_T nm_mtx;  /* protect the allocator */
-	u_int nm_totalsize; /* shorthand */
+	uint64_t nm_totalsize; /* shorthand */
 
 	u_int flags;
 #define NETMAP_MEM_FINALIZED	0x1	/* preallocation done */
@@ -215,7 +215,7 @@ netmap_mem_##name(struct netmap_adapter *na, t1 a1) \
 }
 
 NMD_DEFCB1(int, get_lut, struct netmap_lut *);
-NMD_DEFCB3(int, get_info, u_int *, u_int *, uint16_t *);
+NMD_DEFCB3(int, get_info, uint64_t *, u_int *, uint16_t *);
 NMD_DEFCB1(vm_paddr_t, ofstophys, vm_ooffset_t);
 static int netmap_mem_config(struct netmap_mem_d *);
 NMD_DEFCB(int, config);
@@ -764,7 +764,8 @@ PMDL
 win32_build_user_vm_map(struct netmap_mem_d* nmd)
 {
 	int i, j;
-	u_int memsize, memflags, ofs = 0;
+	size_t memsize, ofs = 0;
+	u_int memflags;
 	PMDL mainMdl, tempMdl;
 
 	if (netmap_mem_get_info(nmd, &memsize, &memflags, NULL)) {
@@ -834,7 +835,7 @@ netmap_mem2_get_pool_info(struct netmap_mem_d* nmd, u_int pool, u_int *clustsize
 }
 
 static int
-netmap_mem2_get_info(struct netmap_mem_d* nmd, u_int* size, u_int *memflags,
+netmap_mem2_get_info(struct netmap_mem_d* nmd, uint64_t* size, u_int *memflags,
 	nm_memid_t *id)
 {
 	int error = 0;
@@ -850,7 +851,7 @@ netmap_mem2_get_info(struct netmap_mem_d* nmd, u_int* size, u_int *memflags,
 			*size = 0;
 			for (i = 0; i < NETMAP_POOLS_NR; i++) {
 				struct netmap_obj_pool *p = nmd->pools + i;
-				*size += (p->_numclusters * p->_clustsize);
+				*size += ((uint64_t)p->_numclusters * p->_clustsize);
 			}
 		}
 	}
@@ -1357,7 +1358,7 @@ netmap_finalize_obj_allocator(struct netmap_obj_pool *p)
 #endif
 		}
 	}
-	p->memtotal = p->numclusters * p->_clustsize;
+	p->memtotal = (uint64_t)p->numclusters * p->_clustsize;
 	if (netmap_verbose)
 		D("Pre-allocated %d clusters (%d/%dKB) for '%s'",
 		    p->numclusters, p->_clustsize >> 10,
@@ -1981,7 +1982,7 @@ netmap_mem_pools_info_get(struct nmreq *nmr, struct netmap_mem_d *nmd)
 	uintptr_t *pp = (uintptr_t *)&nmr->nr_arg1;
 	struct netmap_pools_info *upi = (struct netmap_pools_info *)(*pp);
 	struct netmap_pools_info pi;
-	unsigned int memsize;
+	uint64_t memsize;
 	uint16_t memid;
 	int ret;
 
@@ -2125,7 +2126,7 @@ netmap_mem_pt_guest_get_lut(struct netmap_mem_d *nmd, struct netmap_lut *lut)
 }
 
 static int
-netmap_mem_pt_guest_get_info(struct netmap_mem_d *nmd, u_int *size,
+netmap_mem_pt_guest_get_info(struct netmap_mem_d *nmd, size_t *size,
 			     u_int *memflags, uint16_t *id)
 {
 	int error = 0;

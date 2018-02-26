@@ -426,7 +426,7 @@ main(int argc, char **argv)
 		ret = poll(pollfd, 2, 2500);
 #endif /* defined(_WIN32) || defined(BUSYWAIT) */
 		if (ret <= 0 || verbose)
-		    D("poll %s [0] ev %x %x rx %d@%d tx %d,"
+		    ND("poll %s [0] ev %x %x rx %d@%d tx %d,"
 			     " [1] ev %x %x rx %d@%d tx %d",
 				ret <= 0 ? "timeout" : "ok",
 				pollfd[0].events,

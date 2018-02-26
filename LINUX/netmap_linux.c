@@ -993,7 +993,8 @@ linux_netmap_mmap(struct file *f, struct vm_area_struct *vma)
 {
 	int error = 0;
 	unsigned long off;
-	u_int memsize, memflags;
+	uint64_t memsize;
+	u_int memflags;
 	struct netmap_priv_d *priv = f->private_data;
 	struct netmap_adapter *na = priv->np_na;
 	/*
