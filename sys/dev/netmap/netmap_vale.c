@@ -2336,7 +2336,7 @@ netmap_vp_create(struct nmreq *nmr, struct ifnet *ifp,
 	na->nm_krings_create = netmap_vp_krings_create;
 	na->nm_krings_delete = netmap_vp_krings_delete;
 	na->nm_dtor = netmap_vp_dtor;
-	D("nr_arg2 %d", nmr->nr_arg2);
+	ND("nr_arg2 %d", nmr->nr_arg2);
 	na->nm_mem = nmd ?
 		netmap_mem_get(nmd):
 		netmap_mem_get(&nm_mem);
