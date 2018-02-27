@@ -443,14 +443,14 @@ struct netmap_mem_d nm_mem = {	/* Our memory allocator. */
 			.objminsize = sizeof(struct netmap_ring),
 			.objmaxsize = 32*PAGE_SIZE,
 			.nummin     = 2,
-			.nummax	    = 8256,
+			.nummax	    = 8512,
 		},
 		[NETMAP_BUF_POOL] = {
 			.name	= "netmap_buf",
 			.objminsize = 64,
 			.objmaxsize = 65536,
 			.nummin     = 4,
-			.nummax	    = 3200000, /* one million! */
+			.nummax	    = 3280000, /* one million! */
 		},
 	},
 
