@@ -146,10 +146,10 @@ nmreq_from_legacy(struct nmreq *nmr, u_long ioctl_cmd)
 			break;
 		}
 		case NETMAP_BDG_ATTACH: {
-			struct nmreq_vale_attach *req = nm_os_malloc(sizeof(*req));
+			struct nmreq_bdg_attach *req = nm_os_malloc(sizeof(*req));
 			if (!req) { goto oom; }
 			hdr->nr_body = (uintptr_t)req;
-			hdr->nr_reqtype = NETMAP_REQ_VALE_ATTACH;
+			hdr->nr_reqtype = NETMAP_REQ_BDG_ATTACH;
 			if (nmreq_register_from_legacy(nmr, hdr, &req->reg)) {
 				goto oom;
 			}
@@ -162,8 +162,8 @@ nmreq_from_legacy(struct nmreq *nmr, u_long ioctl_cmd)
 			break;
 		}
 		case NETMAP_BDG_DETACH: {
-			hdr->nr_reqtype = NETMAP_REQ_VALE_DETACH;
-			hdr->nr_body = (uintptr_t)nm_os_malloc(sizeof(struct nmreq_vale_detach));
+			hdr->nr_reqtype = NETMAP_REQ_BDG_DETACH;
+			hdr->nr_body = (uintptr_t)nm_os_malloc(sizeof(struct nmreq_bdg_detach));
 			break;
 		}
 		case NETMAP_BDG_VNET_HDR:
@@ -198,8 +198,8 @@ nmreq_from_legacy(struct nmreq *nmr, u_long ioctl_cmd)
 			if (!req) { goto oom; }
 			hdr->nr_body = (uintptr_t)req;
 			hdr->nr_reqtype = (nmr->nr_cmd == NETMAP_BDG_POLLING_ON) ?
-				NETMAP_REQ_VALE_POLLING_ENABLE :
-				NETMAP_REQ_VALE_POLLING_DISABLE;
+				NETMAP_REQ_BDG_POLLING_ENABLE :
+				NETMAP_REQ_BDG_POLLING_DISABLE;
 			switch (nmr->nr_flags & NR_REG_MASK) {
 			default:
 				req->nr_mode = 0; /* invalid */
@@ -226,10 +226,10 @@ nmreq_from_legacy(struct nmreq *nmr, u_long ioctl_cmd)
 	}
 	case NIOCGINFO: {
 		if (nmr->nr_cmd == NETMAP_BDG_LIST) {
-			struct nmreq_vale_list *req = nm_os_malloc(sizeof(*req));
+			struct nmreq_bdg_list *req = nm_os_malloc(sizeof(*req));
 			if (!req) { goto oom; }
 			hdr->nr_body = (uintptr_t)req;
-			hdr->nr_reqtype = NETMAP_REQ_VALE_LIST;
+			hdr->nr_reqtype = NETMAP_REQ_BDG_LIST;
 			req->nr_bridge_idx = nmr->nr_arg1;
 			req->nr_port_idx = nmr->nr_arg2;
 		} else {
@@ -305,18 +305,18 @@ nmreq_to_legacy(struct nmreq_header *hdr, struct nmreq *nmr)
 		nmr->nr_arg2 = req->nr_mem_id;
 		break;
 	}
-	case NETMAP_REQ_VALE_ATTACH: {
-		struct nmreq_vale_attach *req =
-			(struct nmreq_vale_attach *)(uintptr_t)hdr->nr_body;
+	case NETMAP_REQ_BDG_ATTACH: {
+		struct nmreq_bdg_attach *req =
+			(struct nmreq_bdg_attach *)(uintptr_t)hdr->nr_body;
 		nmreq_register_to_legacy(&req->reg, nmr);
 		break;
 	}
-	case NETMAP_REQ_VALE_DETACH: {
+	case NETMAP_REQ_BDG_DETACH: {
 		break;
 	}
-	case NETMAP_REQ_VALE_LIST: {
-		struct nmreq_vale_list *req =
-			(struct nmreq_vale_list *)(uintptr_t)hdr->nr_body;
+	case NETMAP_REQ_BDG_LIST: {
+		struct nmreq_bdg_list *req =
+			(struct nmreq_bdg_list *)(uintptr_t)hdr->nr_body;
 		strncpy(nmr->nr_name, hdr->nr_name, sizeof(nmr->nr_name));
 		nmr->nr_arg1 = req->nr_bridge_idx;
 		nmr->nr_arg2 = req->nr_port_idx;
@@ -340,8 +340,8 @@ nmreq_to_legacy(struct nmreq_header *hdr, struct nmreq *nmr)
 		break;
 	}
 	case NETMAP_REQ_VALE_DELIF:
-	case NETMAP_REQ_VALE_POLLING_ENABLE:
-	case NETMAP_REQ_VALE_POLLING_DISABLE: {
+	case NETMAP_REQ_BDG_POLLING_ENABLE:
+	case NETMAP_REQ_BDG_POLLING_DISABLE: {
 		break;
 	}
 	}

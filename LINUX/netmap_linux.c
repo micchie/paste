@@ -28,6 +28,7 @@
 
 #include <net/netmap.h>
 #include <dev/netmap/netmap_kern.h>
+#include <dev/netmap/netmap_bdg.h>
 #include <net/netmap_virt.h>
 #include <dev/netmap/netmap_mem2.h>
 #include <net/ip6_checksum.h>
@@ -1395,7 +1396,6 @@ static struct file_operations netmap_fops = {
 };
 
 
-#ifdef WITH_VALE
 #ifdef CONFIG_NET_NS
 #include <net/netns/generic.h>
 
@@ -1532,7 +1532,6 @@ netmap_bns_unregister(void)
 #endif
 }
 #endif /* CONFIG_NET_NS */
-#endif /* WITH_VALE */
 
 /* ##################### kthread wrapper ##################### */
 #include <linux/eventfd.h>
@@ -2541,7 +2540,6 @@ EXPORT_SYMBOL(netmap_ring_reinit);	/* ring init on error */
 EXPORT_SYMBOL(netmap_reset);		/* ring init routines */
 EXPORT_SYMBOL(netmap_rx_irq);	        /* default irq handler */
 EXPORT_SYMBOL(netmap_no_pendintr);	/* XXX mitigation - should go away */
-#ifdef WITH_VALE
 EXPORT_SYMBOL(netmap_bdg_regops);	/* bridge configuration routine */
 EXPORT_SYMBOL(netmap_bdg_name);		/* the bridge the vp is attached to */
 EXPORT_SYMBOL(nm_bdg_update_private_data);
@@ -2549,6 +2547,7 @@ EXPORT_SYMBOL(netmap_bdg_create);
 EXPORT_SYMBOL(netmap_bdg_destroy);
 EXPORT_SYMBOL(nm_bdg_ctl_attach);
 EXPORT_SYMBOL(nm_bdg_ctl_detach);
+#ifdef WITH_VALE
 EXPORT_SYMBOL(nm_vi_create);
 EXPORT_SYMBOL(nm_vi_destroy);
 #endif /* WITH_VALE */

@@ -178,7 +178,7 @@ port_register_single_ring_couple(int fd, struct TestContext *ctx)
 static int
 vale_attach(int fd, struct TestContext *ctx)
 {
-	struct nmreq_vale_attach req;
+	struct nmreq_bdg_attach req;
 	struct nmreq_header hdr;
 	char vpname[256];
 	int ret;
@@ -214,7 +214,7 @@ static int
 vale_detach(int fd, struct TestContext *ctx)
 {
 	struct nmreq_header hdr;
-	struct nmreq_vale_detach req;
+	struct nmreq_bdg_detach req;
 	char vpname[256];
 	int ret;
 

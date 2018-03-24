@@ -1360,8 +1360,8 @@ do_nmr_legacy()
 static struct nmreq_header curr_hdr = {.nr_version = NETMAP_API};
 static struct nmreq_register curr_register;
 static struct nmreq_port_info_get curr_port_info_get;
-static struct nmreq_vale_attach curr_vale_attach;
-static struct nmreq_vale_list curr_vale_list;
+static struct nmreq_bdg_attach curr_vale_attach;
+static struct nmreq_bdg_list curr_vale_list;
 static struct nmreq_port_hdr curr_port_hdr;
 static struct nmreq_vale_newif curr_vale_newif;
 static struct nmreq_vale_polling curr_vale_polling;
@@ -1661,14 +1661,14 @@ do_hdr_dump()
 		printf("info-get");
 		body_dump = nmr_body_dump_port_info_get;
 		break;
-	case NETMAP_REQ_VALE_ATTACH:
+	case NETMAP_REQ_BDG_ATTACH:
 		printf("vale-attach");
 		body_dump = nmr_body_dump_vale_attach;
 		break;
-	case NETMAP_REQ_VALE_DETACH:
+	case NETMAP_REQ_BDG_DETACH:
 		printf("vale-detach");
 		break;
-	case NETMAP_REQ_VALE_LIST:
+	case NETMAP_REQ_BDG_LIST:
 		printf("vale-list");
 		body_dump = nmr_body_dump_vale_list;
 		break;
@@ -1754,12 +1754,12 @@ do_hdr_type()
 		curr_hdr.nr_reqtype = NETMAP_REQ_PORT_INFO_GET;
 		curr_hdr.nr_body    = (uintptr_t)&curr_port_info_get;
 	} else if (strcmp(type, "vale-attach") == 0) {
-		curr_hdr.nr_reqtype = NETMAP_REQ_VALE_ATTACH;
+		curr_hdr.nr_reqtype = NETMAP_REQ_BDG_ATTACH;
 		curr_hdr.nr_body    = (uintptr_t)&curr_vale_attach;
 	} else if (strcmp(type, "vale-detach") == 0) {
-		curr_hdr.nr_reqtype = NETMAP_REQ_VALE_DETACH;
+		curr_hdr.nr_reqtype = NETMAP_REQ_BDG_DETACH;
 	} else if (strcmp(type, "vale-list") == 0) {
-		curr_hdr.nr_reqtype = NETMAP_REQ_VALE_LIST;
+		curr_hdr.nr_reqtype = NETMAP_REQ_BDG_LIST;
 		curr_hdr.nr_body    = (uintptr_t)&curr_vale_list;
 	} else if (strcmp(type, "port-hdr-set") == 0) {
 		curr_hdr.nr_reqtype = NETMAP_REQ_PORT_HDR_SET;

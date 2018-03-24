@@ -1535,12 +1535,9 @@ netmap_get_na(struct nmreq_header *hdr,
 	if (error || *na != NULL)
 		goto out;
 
-	/* try to see if this is a bridge port */
-	error = netmap_get_bdg_na(hdr, na, nmd, create);
-	if (error)
-		goto out;
-
-	if (*na != NULL) /* valid match in netmap_get_bdg_na() */
+	/* try to see if this is a vale port */
+	error = netmap_get_vale_na(hdr, na, nmd, create);
+	if (error || *na != NULL)
 		goto out;
 
 	/*
@@ -2509,18 +2506,17 @@ netmap_ioctl(struct netmap_priv_d *priv, u_long cmd, caddr_t data,
 			NMG_UNLOCK();
 			break;
 		}
-#ifdef WITH_VALE
-		case NETMAP_REQ_VALE_ATTACH: {
+		case NETMAP_REQ_BDG_ATTACH: {
 			error = nm_bdg_ctl_attach(hdr, NULL /* userspace request */);
 			break;
 		}
 
-		case NETMAP_REQ_VALE_DETACH: {
+		case NETMAP_REQ_BDG_DETACH: {
 			error = nm_bdg_ctl_detach(hdr, NULL /* userspace request */);
 			break;
 		}
 
-		case NETMAP_REQ_VALE_LIST: {
+		case NETMAP_REQ_BDG_LIST: {
 			error = netmap_bdg_list(hdr);
 			break;
 		}
@@ -2544,7 +2540,7 @@ netmap_ioctl(struct netmap_priv_d *priv, u_long cmd, caddr_t data,
 			NMG_LOCK();
 			hdr->nr_reqtype = NETMAP_REQ_REGISTER;
 			hdr->nr_body = (uintptr_t)&regreq;
-			error = netmap_get_bdg_na(hdr, &na, NULL, 0);
+			error = netmap_get_vale_na(hdr, &na, NULL, 0);
 			hdr->nr_reqtype = NETMAP_REQ_PORT_HDR_SET;
 			hdr->nr_body = (uintptr_t)req;
 			if (na && !error) {
@@ -2587,6 +2583,12 @@ netmap_ioctl(struct netmap_priv_d *priv, u_long cmd, caddr_t data,
 			break;
 		}
 
+		case NETMAP_REQ_BDG_POLLING_ENABLE:
+		case NETMAP_REQ_BDG_POLLING_DISABLE: {
+			error = nm_bdg_polling(hdr);
+			break;
+		}
+#ifdef WITH_VALE
 		case NETMAP_REQ_VALE_NEWIF: {
 			error = nm_vi_create(hdr);
 			break;
@@ -2597,11 +2599,6 @@ netmap_ioctl(struct netmap_priv_d *priv, u_long cmd, caddr_t data,
 			break;
 		}
 
-		case NETMAP_REQ_VALE_POLLING_ENABLE:
-		case NETMAP_REQ_VALE_POLLING_DISABLE: {
-			error = nm_bdg_polling(hdr);
-			break;
-		}
 #endif  /* WITH_VALE */
 		case NETMAP_REQ_POOLS_INFO_GET: {
 			struct nmreq_pools_info *req =
@@ -2719,12 +2716,12 @@ nmreq_size_by_type(uint16_t nr_reqtype)
 		return sizeof(struct nmreq_register);
 	case NETMAP_REQ_PORT_INFO_GET:
 		return sizeof(struct nmreq_port_info_get);
-	case NETMAP_REQ_VALE_ATTACH:
-		return sizeof(struct nmreq_vale_attach);
-	case NETMAP_REQ_VALE_DETACH:
-		return sizeof(struct nmreq_vale_detach);
-	case NETMAP_REQ_VALE_LIST:
-		return sizeof(struct nmreq_vale_list);
+	case NETMAP_REQ_BDG_ATTACH:
+		return sizeof(struct nmreq_bdg_attach);
+	case NETMAP_REQ_BDG_DETACH:
+		return sizeof(struct nmreq_bdg_detach);
+	case NETMAP_REQ_BDG_LIST:
+		return sizeof(struct nmreq_bdg_list);
 	case NETMAP_REQ_PORT_HDR_SET:
 	case NETMAP_REQ_PORT_HDR_GET:
 		return sizeof(struct nmreq_port_hdr);
@@ -2732,8 +2729,8 @@ nmreq_size_by_type(uint16_t nr_reqtype)
 		return sizeof(struct nmreq_vale_newif);
 	case NETMAP_REQ_VALE_DELIF:
 		return 0;
-	case NETMAP_REQ_VALE_POLLING_ENABLE:
-	case NETMAP_REQ_VALE_POLLING_DISABLE:
+	case NETMAP_REQ_BDG_POLLING_ENABLE:
+	case NETMAP_REQ_BDG_POLLING_DISABLE:
 		return sizeof(struct nmreq_vale_polling);
 	case NETMAP_REQ_POOLS_INFO_GET:
 		return sizeof(struct nmreq_pools_info);
@@ -3353,13 +3350,11 @@ netmap_attach_common(struct netmap_adapter *na)
 		/* use the global allocator */
 		na->nm_mem = netmap_mem_get(&nm_mem);
 	}
-#ifdef WITH_VALE
 	if (na->nm_bdg_attach == NULL)
 		/* no special nm_bdg_attach callback. On VALE
 		 * attach, we need to interpose a bwrap
 		 */
 		na->nm_bdg_attach = netmap_bwrap_attach;
-#endif
 
 	return 0;
 }

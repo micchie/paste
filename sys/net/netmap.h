@@ -495,11 +495,11 @@ enum {
 	/* Get information from a netmap port. */
 	NETMAP_REQ_PORT_INFO_GET,
 	/* Attach a netmap port to a VALE switch. */
-	NETMAP_REQ_VALE_ATTACH,
+	NETMAP_REQ_BDG_ATTACH,
 	/* Detach a netmap port from a VALE switch. */
-	NETMAP_REQ_VALE_DETACH,
+	NETMAP_REQ_BDG_DETACH,
 	/* List the ports attached to a VALE switch. */
-	NETMAP_REQ_VALE_LIST,
+	NETMAP_REQ_BDG_LIST,
 	/* Set the port header length (was virtio-net header length). */
 	NETMAP_REQ_PORT_HDR_SET,
 	/* Get the port header length (was virtio-net header length). */
@@ -508,10 +508,10 @@ enum {
 	NETMAP_REQ_VALE_NEWIF,
 	/* Delete a persistent VALE port. */
 	NETMAP_REQ_VALE_DELIF,
-	/* Enable polling kernel thread(s) on an attached VALE port. */
-	NETMAP_REQ_VALE_POLLING_ENABLE,
-	/* Disable polling kernel thread(s) on an attached VALE port. */
-	NETMAP_REQ_VALE_POLLING_DISABLE,
+	/* Enable polling kernel thread(s) on an attached bridge port. */
+	NETMAP_REQ_BDG_POLLING_ENABLE,
+	/* Disable polling kernel thread(s) on an attached bridge port. */
+	NETMAP_REQ_BDG_POLLING_DISABLE,
 	/* Get info about the pools of a memory allocator. */
 	NETMAP_REQ_POOLS_INFO_GET,
 };
@@ -604,36 +604,37 @@ struct nmreq_port_info_get {
 };
 
 #define	NM_BDG_NAME		"vale"	/* prefix for bridge port name */
+#define	NM_STACK_NAME		"stack"	/* prefix for stack port name */
 
 /*
- * nr_reqtype: NETMAP_REQ_VALE_ATTACH
+ * nr_reqtype: NETMAP_REQ_BDG_ATTACH
  * Attach a netmap port to a VALE switch. Both the name of the netmap
  * port and the VALE switch are specified through the nr_name argument.
  * The attach operation could need to register a port, so at least
  * the same arguments are available.
  * port_index will contain the index where the port has been attached.
  */
-struct nmreq_vale_attach {
+struct nmreq_bdg_attach {
 	struct nmreq_register reg;
 	uint32_t port_index;
 };
 
 /*
- * nr_reqtype: NETMAP_REQ_VALE_DETACH
+ * nr_reqtype: NETMAP_REQ_BDG_DETACH
  * Detach a netmap port from a VALE switch. Both the name of the netmap
  * port and the VALE switch are specified through the nr_name argument.
  * port_index will contain the index where the port was attached.
  */
-struct nmreq_vale_detach {
+struct nmreq_bdg_detach {
 	uint32_t port_index;
 };
 
 /*
- * nr_reqtype: NETMAP_REQ_VALE_LIST
+ * nr_reqtype: NETMAP_REQ_BDG_LIST
  * List the ports of a VALE switch.
  */
-struct nmreq_vale_list {
-	/* Name of the VALE port (valeXXX:YYY) or empty. */
+struct nmreq_bdg_list {
+	/* Name of the bridge port (e.g., valeXXX:YYY) or empty. */
 	uint16_t	nr_bridge_idx;
 	uint32_t	nr_port_idx;
 };
@@ -659,7 +660,7 @@ struct nmreq_vale_newif {
 };
 
 /*
- * nr_reqtype: NETMAP_REQ_VALE_POLLING_ENABLE or NETMAP_REQ_VALE_POLLING_DISABLE
+ * nr_reqtype: NETMAP_REQ_BDG_POLLING_ENABLE or NETMAP_REQ_BDG_POLLING_DISABLE
  * Enable or disable polling kthreads on a VALE port.
  */
 struct nmreq_vale_polling {

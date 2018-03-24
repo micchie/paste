@@ -507,9 +507,7 @@ struct netmap_kring {
 					 */
 #endif /* WITH_PIPES */
 
-#ifdef WITH_VALE
 	int (*save_notify)(struct netmap_kring *kring, int flags);
-#endif
 
 #ifdef WITH_MONITOR
 	/* array of krings that are monitoring this kring */
@@ -641,6 +639,8 @@ struct nm_config_info {
 	unsigned num_rx_descs;
 	unsigned rx_buf_maxsize;
 };
+
+struct nm_bdg_args;
 
 /*
  * The "struct netmap_adapter" extends the "struct adapter"
@@ -783,7 +783,6 @@ struct netmap_adapter {
 	int (*nm_config)(struct netmap_adapter *, struct nm_config_info *info);
 	int (*nm_krings_create)(struct netmap_adapter *);
 	void (*nm_krings_delete)(struct netmap_adapter *);
-#ifdef WITH_VALE
 	/*
 	 * nm_bdg_attach() initializes the na_vp field to point
 	 *      to an adapter that can be attached to a VALE switch. If the
@@ -799,7 +798,8 @@ struct netmap_adapter {
 	 *      initializations
 	 *      Called with NMG_LOCK held.
 	 */
-	int (*nm_bdg_attach)(const char *bdg_name, struct netmap_adapter *);
+	int (*nm_bdg_attach)(const char *bdg_name,
+			struct netmap_adapter *, struct nm_bdg_args *);
 	int (*nm_bdg_ctl)(struct nmreq_header *, struct netmap_adapter *);
 
 	/* adapter used to attach this adapter to a VALE switch (if any) */
@@ -807,7 +807,6 @@ struct netmap_adapter {
 	/* adapter used to attach the host rings of this adapter
 	 * to a VALE switch (if any) */
 	struct netmap_vp_adapter *na_hostvp;
-#endif
 
 	/* standard refcount to control the lifetime of the adapter
 	 * (it should be equal to the lifetime of the corresponding ifp)
@@ -993,7 +992,6 @@ netmap_all_rings(struct netmap_adapter *na, enum txrx t)
 	return max(nma_get_nrings(na, t) + 1, netmap_real_rings(na, t));
 }
 
-#ifdef WITH_VALE
 struct nm_bdg_polling_state;
 /*
  * Bridge wrapper for non VALE ports attached to a VALE switch.
@@ -1043,6 +1041,8 @@ struct netmap_bwrap_adapter {
 	struct netmap_vp_adapter up;
 	struct netmap_vp_adapter host;  /* for host rings */
 	struct netmap_adapter *hwna;	/* the underlying device */
+	/* applied only to non-host rings */
+	int (*nm_intr_notify)(struct netmap_kring *kring, int flags);
 
 	/*
 	 * When we attach a physical interface to the bridge, we
@@ -1061,15 +1061,23 @@ struct netmap_bwrap_adapter {
 int nm_bdg_ctl_attach(struct nmreq_header *hdr, void *auth_token);
 int nm_bdg_ctl_detach(struct nmreq_header *hdr, void *auth_token);
 int nm_bdg_polling(struct nmreq_header *hdr);
-int netmap_bwrap_attach(const char *name, struct netmap_adapter *);
-int netmap_vi_create(struct nmreq_header *hdr, int);
+int netmap_bwrap_attach(const char *name, struct netmap_adapter *,
+			struct nm_bdg_args *);
+int netmap_vp_create(struct nmreq_header *hdr, struct ifnet *ifp,
+		struct netmap_mem_d *nmd, struct netmap_vp_adapter **ret,
+		struct nm_bdg_args *args);
+int netmap_vp_bdg_ctl(struct nmreq_header *hdr, struct netmap_adapter *na);
 int nm_vi_create(struct nmreq_header *);
 int nm_vi_destroy(const char *name);
 int netmap_bdg_list(struct nmreq_header *hdr);
+int nm_bdg_prefix(const char *name);
+/* XXX Only pipe unconditionally calls netmap_vi_create() outside VALE */
+#ifdef WITH_VALE
+int netmap_vi_create(struct nmreq_header *hdr, int);
+#else
+#define netmap_vi_create(_1, _2)	0
+#endif
 
-#else /* !WITH_VALE */
-#define netmap_vi_create(hdr, a) (EOPNOTSUPP)
-#endif /* WITH_VALE */
 
 #ifdef WITH_PIPES
 
@@ -1273,19 +1281,22 @@ int netmap_rx_irq(struct ifnet *, u_int, u_int *);
 int netmap_common_irq(struct netmap_adapter *, u_int, u_int *work_done);
 
 
+const char *netmap_bdg_name(struct netmap_vp_adapter *);
+u_int netmap_bdg_active_ports(struct nm_bridge *b);
 #ifdef WITH_VALE
 /* functions used by external modules to interface with VALE */
 #define netmap_vp_to_ifp(_vp)	((_vp)->up.ifp)
 #define netmap_ifp_to_vp(_ifp)	(NA(_ifp)->na_vp)
 #define netmap_ifp_to_host_vp(_ifp) (NA(_ifp)->na_hostvp)
 #define netmap_bdg_idx(_vp)	((_vp)->bdg_port)
-const char *netmap_bdg_name(struct netmap_vp_adapter *);
+int netmap_get_vale_na(struct nmreq_header *hdr,
+	struct netmap_adapter **na, struct netmap_mem_d *nmd, int create);
 #else /* !WITH_VALE */
 #define netmap_vp_to_ifp(_vp)	NULL
 #define netmap_ifp_to_vp(_ifp)	NULL
 #define netmap_ifp_to_host_vp(_ifp) NULL
 #define netmap_bdg_idx(_vp)	-1
-#define netmap_bdg_name(_vp)	NULL
+#define netmap_get_vale_na(_1, _2, _3, _4)	0
 #endif /* WITH_VALE */
 
 static inline int
@@ -1480,56 +1491,11 @@ void netmap_unget_na(struct netmap_adapter *na, struct ifnet *ifp);
 int netmap_get_hw_na(struct ifnet *ifp,
 		struct netmap_mem_d *nmd, struct netmap_adapter **na);
 
-
-#ifdef WITH_VALE
-/*
- * The following bridge-related functions are used by other
- * kernel modules.
- *
- * VALE only supports unicast or broadcast. The lookup
- * function can return 0 .. NM_BDG_MAXPORTS-1 for regular ports,
- * NM_BDG_MAXPORTS for broadcast, NM_BDG_MAXPORTS+1 to indicate
- * drop.
- */
-typedef uint32_t (*bdg_lookup_fn_t)(struct nm_bdg_fwd *ft, uint8_t *ring_nr,
-		struct netmap_vp_adapter *, void *private_data);
-typedef int (*bdg_config_fn_t)(struct nm_ifreq *);
-typedef void (*bdg_dtor_fn_t)(const struct netmap_vp_adapter *);
-typedef void *(*bdg_update_private_data_fn_t)(void *private_data, void *callback_data, int *error);
-struct netmap_bdg_ops {
-	bdg_lookup_fn_t lookup;
-	bdg_config_fn_t config;
-	bdg_dtor_fn_t	dtor;
-};
-
-uint32_t netmap_bdg_learning(struct nm_bdg_fwd *ft, uint8_t *dst_ring,
-		struct netmap_vp_adapter *, void *private_data);
-
-#define	NM_BRIDGES		8	/* number of bridges */
-#define	NM_BDG_MAXPORTS		254	/* up to 254 */
-#define	NM_BDG_BROADCAST	NM_BDG_MAXPORTS
-#define	NM_BDG_NOPORT		(NM_BDG_MAXPORTS+1)
-
-/* these are redefined in case of no VALE support */
-int netmap_get_bdg_na(struct nmreq_header *hdr, struct netmap_adapter **na,
-		struct netmap_mem_d *nmd, int create);
 struct nm_bridge *netmap_init_bridges2(u_int);
 void netmap_uninit_bridges2(struct nm_bridge *, u_int);
 int netmap_init_bridges(void);
 void netmap_uninit_bridges(void);
-int netmap_bdg_regops(const char *name, struct netmap_bdg_ops *bdg_ops, void *private_data, void *auth_token);
-int nm_bdg_update_private_data(const char *name, bdg_update_private_data_fn_t callback,
-	void *callback_data, void *auth_token);
 int netmap_bdg_config(struct nm_ifreq *nifr);
-void *netmap_bdg_create(const char *bdg_name, int *return_status);
-int netmap_bdg_destroy(const char *bdg_name, void *auth_token);
-
-#else /* !WITH_VALE */
-#define	netmap_get_bdg_na(_1, _2, _3, _4)	0
-#define netmap_init_bridges(_1) 0
-#define netmap_uninit_bridges()
-#define	netmap_bdg_regops(_1, _2)	EINVAL
-#endif /* !WITH_VALE */
 
 #ifdef WITH_PIPES
 /* max number of pipes per device */
