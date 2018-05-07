@@ -625,7 +625,7 @@ nm_parse(const char *ifname, struct nm_desc *d, char *err)
 
 	errno = 0;
 
-	is_vale = (ifname[0] == 'v');
+	is_vale = (ifname[0] == 'v') || (ifname[0] == 's');
 	if (is_vale) {
 		port = index(ifname, ':');
 		if (port == NULL) {
@@ -634,7 +634,8 @@ nm_parse(const char *ifname, struct nm_desc *d, char *err)
 			goto fail;
 		}
 
-		if (!nm_is_identifier(ifname + 4, port)) {
+		if (!nm_is_identifier(ifname + 4, port) &&
+		    !nm_is_identifier(ifname + 5, port)) {
 			snprintf(errmsg, MAXERRMSG, "invalid bridge name");
 			goto fail;
 		}
