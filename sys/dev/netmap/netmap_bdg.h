@@ -74,6 +74,7 @@ int nm_bdg_update_private_data(const char *name, bdg_update_private_data_fn_t ca
 	void *callback_data, void *auth_token);
 void *netmap_bdg_create(const char *bdg_name, int *return_status);
 int netmap_bdg_destroy(const char *bdg_name, void *auth_token);
+int nm_bdg_ctl_detach_locked(struct nmreq_header *, void *auth_token);
 
 /*
  * system parameters (most of them in netmap_kern.h)

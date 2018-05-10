@@ -770,13 +770,23 @@ unlock_exit:
 int
 nm_bdg_ctl_detach(struct nmreq_header *hdr, void *auth_token)
 {
+	int error;
+
+	NMG_LOCK();
+	error = nm_bdg_ctl_detach_locked(hdr, auth_token);
+	NMG_UNLOCK();
+	return error;
+}
+
+int
+nm_bdg_ctl_detach_locked(struct nmreq_header *hdr, void *auth_token)
+{
 	struct nmreq_bdg_detach *nmreq_det = (void *)(uintptr_t)hdr->nr_body;
 	struct netmap_vp_adapter *vpna;
 	struct netmap_adapter *na;
 	struct nm_bridge *b = NULL;
 	int error;
 
-	NMG_LOCK();
 	/* permission check for modified bridges */
 	b = nm_find_bridge(hdr->nr_name, 0 /* don't create */, NULL);
 	if (b && !nm_bdg_valid_auth_token(b, auth_token)) {
@@ -819,7 +829,6 @@ nm_bdg_ctl_detach(struct nmreq_header *hdr, void *auth_token)
 unref_exit:
 	netmap_adapter_put(na);
 unlock_exit:
-	NMG_UNLOCK();
 	return error;
 
 }
