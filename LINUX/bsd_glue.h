@@ -512,7 +512,7 @@ void netmap_bns_unregister(void);
 #define curcpu         smp_processor_id()
 #define mp_maxid       (num_online_cpus() - 1) // XXX num_possible_cpus()?
 
-/* used for stackmap */
+/* used for paste */
 #define NM_LIST_INIT(_head)	INIT_HLIST_HEAD(_head)
 #define NM_LIST_ENTRY(_type)	struct hlist_node
 #define NM_LIST_ADD(_head, _n, _pos) 	hlist_add_head_rcu(&((_n)->_pos), _head)
@@ -528,8 +528,8 @@ void netmap_bns_unregister(void);
 #define	SOCKBUF_UNLOCK(sb)
 
 /* NMCB() is only valid for mbuf populated by nm_os_build_mbuf() */
-#define NMCB(_m) ((struct stmp_cb *)(_m)->head)
-#define NMCB_BUF(_buf) ((struct stmp_cb *)(_buf))
+#define NMCB(_m) ((struct nm_st_cb *)(_m)->head)
+#define NMCB_BUF(_buf) ((struct nm_st_cb *)(_buf))
 #define NMCB_EXT(_m, _i, _bufsiz) \
 	NMCB_BUF(page_address(\
 		skb_frag_page(&skb_shinfo((_m))->frags[_i])) + \
@@ -570,15 +570,15 @@ nm_set_mbuf_data_destructor(struct mbuf *m,
 	skb_shinfo(m)->tx_flags |= SKBTX_DEV_ZEROCOPY;
 }
 
-static inline struct stmp_sk_adapter *
-stmp_sk(NM_SOCK_T *sk)
+static inline struct nm_st_sk_adapter *
+nm_st_sk(NM_SOCK_T *sk)
 {
-	return (struct stmp_sk_adapter *)sk->sk_user_data;
+	return (struct nm_st_sk_adapter *)sk->sk_user_data;
 }
 
  /* We overwrite sk->sk_cookie as it appear not to be used */
 static inline void
-stmp_wsk(struct stmp_sk_adapter *ska, NM_SOCK_T *sk)
+nm_st_wsk(struct nm_st_sk_adapter *ska, NM_SOCK_T *sk)
 {
 	sk->sk_user_data = ska;
 }
