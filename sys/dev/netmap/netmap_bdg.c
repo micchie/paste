@@ -1529,8 +1529,8 @@ netmap_vp_create(struct nmreq_header *hdr, struct ifnet *ifp,
 	 */
 	nm_bound_var(&npipes, 2, 1, NM_MAXPIPES, NULL);
 	/* validate extra bufs */
-	nm_bound_var(&extrabufs, 0, 0,
-			128*NM_BDG_MAXSLOTS, NULL);
+	//nm_bound_var(&extrabufs, 0, 0,
+	//		128*NM_BDG_MAXSLOTS, NULL);
 	req->nr_extra_bufs = extrabufs; /* write back */
 	na->num_rx_desc = req->nr_rx_slots;
 	/* Set the mfs to a default value, as it is needed on the VALE
