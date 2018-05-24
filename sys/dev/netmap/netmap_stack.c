@@ -875,6 +875,13 @@ netmap_stack_bwrap_reg(struct netmap_adapter *na, int onoff)
 #endif
 	int error;
 
+	/* DMA offset */
+	na->virt_hdr_len = bna->up.na_bdg->bdg_ports[0]->up.virt_hdr_len;
+	hwna->virt_hdr_len = na->virt_hdr_len;
+	if (hwna->na_flags & NAF_HOST_RINGS) {
+		bna->host.up.virt_hdr_len = hwna->virt_hdr_len;
+	}
+
 	error = netmap_bwrap_reg(na, onoff);
 	if (error)
 		return error;
