@@ -61,6 +61,9 @@
 #if defined(CONFIG_NETMAP_SINK)
 #define WITH_SINK
 #endif
+#if defined(CONFIG_NETMAP_STACK)
+#define WITH_STACK
+#endif
 
 #elif defined (_WIN32)
 #define WITH_VALE	// comment out to disable VALE support
@@ -76,6 +79,7 @@
 #define WITH_PTNETMAP_HOST	/* ptnetmap host support */
 #define WITH_PTNETMAP_GUEST	/* ptnetmap guest support */
 #define WITH_EXTMEM
+#define WITH_STACK
 #endif
 
 #if defined(__FreeBSD__)
