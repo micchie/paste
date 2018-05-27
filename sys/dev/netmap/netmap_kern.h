@@ -1302,6 +1302,12 @@ int netmap_get_vale_na(struct nmreq_header *hdr,
 #define netmap_bdg_idx(_vp)	-1
 #define netmap_get_vale_na(_1, _2, _3, _4)	0
 #endif /* WITH_VALE */
+#ifdef WITH_STACK
+int netmap_get_stack_na(struct nmreq_header *hdr,
+	struct netmap_adapter **na, struct netmap_mem_d *nmd, int create);
+#else /* !WITH_STACK */
+#define netmap_get_stack_na(_1, _2, _3, _4)	0
+#endif /* WITH_STACK */
 
 static inline int
 nm_netmap_on(struct netmap_adapter *na)

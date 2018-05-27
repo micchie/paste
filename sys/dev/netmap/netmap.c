@@ -1540,6 +1540,11 @@ netmap_get_na(struct nmreq_header *hdr,
 	if (error || *na != NULL)
 		goto out;
 
+	/* try to see if this is a vale port */
+	error = netmap_get_stack_na(hdr, na, nmd, create);
+	if (error || *na != NULL)
+		goto out;
+
 	/*
 	 * This must be a hardware na, lookup the name in the system.
 	 * Note that by hardware we actually mean "it shows up in ifconfig".

@@ -733,6 +733,11 @@ nm_bdg_ctl_attach(struct nmreq_header *hdr, void *auth_token)
 		} else if (na != NULL) {
 			break;
 		}
+		error = netmap_get_stack_na(hdr, &na,
+				nmd, 1 /* create if not exists */);
+		if (error) { /* no device */
+			goto unlock_exit;
+		}
 	} while (0);
 	if (na == NULL) { /* BDG prefix missing */
 		error = EINVAL;
