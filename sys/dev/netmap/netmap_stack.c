@@ -1007,15 +1007,16 @@ nm_st_sk_destruct(NM_SOCK_T *sk)
 	struct netmap_stack_adapter *sna;
 
 	ska = nm_st_sk(sk);
+	ND("socket died first ska %p save_destruct %p", ska, ska ? ska->save_sk_destruct : NULL);
 	if (ska->save_sk_destruct) {
 		ska->save_sk_destruct(sk);
 	}
 	sna = (struct netmap_stack_adapter *)ska->na;
-	BDG_WLOCK(sna->up.na_bdg);
+	/* nm_os_st_data_ready() runs bh_lock_sock_nested() */
 	nm_st_unregister_socket(ska);
-	BDG_WUNLOCK(sna->up.na_bdg);
 }
 
+/* Under NMG_LOCK() */
 static void
 nm_st_bdg_dtor(const struct netmap_vp_adapter *vpna)
 {
@@ -1046,6 +1047,7 @@ nm_st_register_fd(struct netmap_adapter *na, int fd)
 	int on = 1;
 	struct sockopt sopt;
 
+	NMG_LOCK();
 	/* first check table size */
 	if (fd >= sna->sk_adapters_max) {
 		struct nm_st_sk_adapter **old = sna->sk_adapters, **new;
@@ -1055,6 +1057,7 @@ nm_st_register_fd(struct netmap_adapter *na, int fd)
 		new = nm_os_malloc(sizeof(new) * newsize);
 		if (!new) {
 			D("failed to extend fd->sk_adapter table");
+			NMG_UNLOCK();
 			return ENOMEM;
 		}
 		if (old) {
@@ -1064,6 +1067,7 @@ nm_st_register_fd(struct netmap_adapter *na, int fd)
 		sna->sk_adapters = new;
 		sna->sk_adapters_max = newsize;
 	}
+	NMG_UNLOCK();
 
 	sk = nm_os_sock_fget(fd, &file);
 	if (!sk)
@@ -1120,10 +1124,15 @@ nm_st_bdg_config(struct nm_ifreq *ifr)
 	strncpy(hdr.nr_name, ifr->nifr_name, sizeof(hdr.nr_name));
 	NMG_LOCK();
 	error = netmap_get_bdg_na(&hdr, &na, NULL, 0, NULL);
+	NMG_UNLOCK();
 	if (!error && na != NULL) {
 		error = nm_st_register_fd(na, fd);
 	}
-	NMG_UNLOCK();
+	if (na) {
+		NMG_LOCK();
+		netmap_adapter_put(na);
+		NMG_UNLOCK();
+	}
 	return error;
 }
 

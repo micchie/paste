@@ -1159,13 +1159,8 @@ nm_os_st_sb_drain(struct netmap_adapter *na, NM_SOCK_T *sk)
 	scb = NMCB(m);
 	if (!nm_st_cb_valid(scb))
 		return;
+	/* No need for BDG_RLOCK() - we don't move packets to stack na */
 	nm_os_st_data_ready(sk);
-	kring = scb_kring(scb);
-	if (kring) {
-		dst_kring = NMR(na, NR_RX)[kring->ring_id % na->num_rx_rings];
-		/* See comment on nm_st_intr_notify() */
-		dst_kring->nm_notify(dst_kring, 0);
-	}
 }
 
 static inline int

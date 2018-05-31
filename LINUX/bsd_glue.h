@@ -566,8 +566,13 @@ nm_set_mbuf_data_destructor(struct mbuf *m,
 	struct nm_ubuf_info *ui, void *cb)
 {
 	ui->ubuf.callback = cb;
-	skb_shinfo(m)->destructor_arg = ui;
-	skb_shinfo(m)->tx_flags |= SKBTX_DEV_ZEROCOPY;
+	if (cb != NULL) {
+		skb_shinfo(m)->destructor_arg = ui;
+		skb_shinfo(m)->tx_flags |= SKBTX_DEV_ZEROCOPY;
+	} else {
+		skb_shinfo(m)->destructor_arg = NULL;
+		skb_shinfo(m)->tx_flags &= ~SKBTX_DEV_ZEROCOPY;
+	}
 }
 
 static inline struct nm_st_sk_adapter *
