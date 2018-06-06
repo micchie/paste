@@ -1147,17 +1147,12 @@ void
 nm_os_st_sb_drain(struct netmap_adapter *na, NM_SOCK_T *sk)
 {
 	struct mbuf *m;
-	struct nm_st_cb *scb;
-	struct netmap_kring *kring, *dst_kring;
 
-	/* drain receive queue (we are under BDG_WLOCK)
-	 * XXX We cannot survive non-netmap packets to this socket
-	 */
+	/* XXX All the packets must be originated from netmap */
 	m = skb_peek(&sk->sk_receive_queue);
 	if (!m)
 		return;
-	scb = NMCB(m);
-	if (!nm_st_cb_valid(scb))
+	if (!nm_st_cb_valid(NMCB(m)))
 		return;
 	/* No need for BDG_RLOCK() - we don't move packets to stack na */
 	nm_os_st_data_ready(sk);
@@ -1187,8 +1182,6 @@ nm_os_build_mbuf(struct netmap_kring *kring, char *buf, u_int len)
 	if (m) {
 		struct skb_shared_info *shinfo;
 
-		//if (unlikely(!nm_os_mbuf_valid(kring->tx_pool[0])))
-		//	panic("invalid m0");
 		*m = *kring->tx_pool[0];
 		m->head = m->data = buf;
 		skb_reset_tail_pointer(m);
