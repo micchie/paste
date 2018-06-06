@@ -296,7 +296,7 @@ nm_st_flush(struct netmap_kring *kring)
 	u_int lim_rx, howmany;
 	u_int dst_nr, nrings;
 	struct netmap_kring *rxkring;
-	int j, want, nonfree_num = 0;
+	int j, want, sent = 0, nonfree_num = 0;
 	uint32_t *nonfree;
 
 	if (na->na_flags & NAF_BDG_MAYSLEEP) {
@@ -382,9 +382,10 @@ nm_st_flush(struct netmap_kring *kring)
 			rs->flags |= NS_BUF_CHANGED;
 			k = nm_next(k, lim_tx);
 			j = nm_next(j, lim_rx);
+			sent++;
 		}
 	} else {
-		int n, sent = 0;
+		int n;
 		for (n = 0; n < ft->nfds && howmany;) {
 			int fd = ft->fds[n];
 			struct nm_st_bdg_q *bq = ft->fde + fd;
@@ -431,10 +432,11 @@ skip:
 		memmove(ft->fds, ft->fds + n, sizeof(ft->fds[0]) * ft->nfds);
 	}
 
-	rxkring->nr_hwtail = j;
+	rxkring->nr_hwtail = j; // no update if !sent
 	mtx_unlock(&rxkring->q_lock);
 
-	rxkring->nm_notify(rxkring, 0);
+	if (sent)
+		rxkring->nm_notify(rxkring, 0);
 	rxkring->nkr_hwlease = rxkring->nr_hwcur;
 
 	/* swap out packets still referred by the stack */
