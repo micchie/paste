@@ -287,7 +287,6 @@ nm_st_kr_rxspace(struct netmap_kring *k)
 	return k->nkr_num_slots - 1 - busy;
 }
 
-/* bdg_{r,w}lock() must be held */
 static void
 nm_st_flush(struct netmap_kring *kring)
 {

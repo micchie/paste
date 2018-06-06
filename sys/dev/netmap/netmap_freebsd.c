@@ -60,6 +60,7 @@
 #include <sys/unistd.h> /* RFNOWAIT */
 #include <sys/sched.h> /* sched_bind() */
 #include <sys/smp.h> /* mp_maxid */
+#include <sys/uio.h> /* struct uio */
 #include <net/if.h>
 #include <net/if_var.h>
 #include <net/if_types.h> /* IFT_ETHER */
@@ -1007,10 +1008,12 @@ __data_ready(struct nm_st_cb *scb)
 			continue;
 		}
 		slot->fd = nm_st_sk(so)->fd;
-		slot->len = m->m_len;
 		/* m_data points payload */
 		slot->offset = m->m_data - M_START(m) - kring->na->virt_hdr_len;
-		ND("scb %p kring %p slot %p slot->offset %u slot->len %u", scb, kring, slot, slot->offset, slot->len);
+		/* XXX just leave the original ? */
+		slot->len = m->m_len + slot->offset + kring->na->virt_hdr_len;
+		ND("scb %p kring %p slot %p slot->offset %u slot->len %u",
+				scb, kring, slot, slot->offset, slot->len);
 		nm_st_add_fdtable(scb, kring);
 
 		nm_st_cb_wstate(scb, SCB_M_TXREF);
@@ -1061,7 +1064,7 @@ nm_os_st_sb_drain(struct netmap_adapter *na, NM_SOCK_T *so)
 		D("invalid scb");
 		return;
 	}
-	D("next nm_os_st_data_ready (SCB %p %d", scb, nm_st_cb_rstate(scb));
+	ND("next nm_os_st_data_ready (SCB %p %d", scb, nm_st_cb_rstate(scb));
 	nm_os_st_data_ready(so, NULL, 0);
 	__data_ready(scb);
 }
@@ -1123,6 +1126,7 @@ nm_os_st_recv(struct netmap_kring *kring, struct netmap_slot *slot)
 	slot->len += na->virt_hdr_len; // Ugly to do here...
 	m = nm_os_get_mbuf(na->ifp, NETMAP_BUF_SIZE(na));
 	if (unlikely(m == NULL)) {
+		D("no mbuf");
 		return 0; // drop and skip
 	}
 	m->m_ext.ext_buf = m->m_data = nmb;

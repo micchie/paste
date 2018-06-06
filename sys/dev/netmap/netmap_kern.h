@@ -162,11 +162,10 @@ struct hrtimer {
 #define NM_SOCK_T struct socket
 #define SAVE_DATA_READY(sk, ska)
 #define RESTORE_DATA_READY(sk, ska)    soupcall_clear(sk, SO_RCV)
-/* XXX FreeBSD doesn't have socket's destructor */
-#define SAVE_DESTRUCTOR(sk, ska)
-#define RESTORE_DESTRUCTOR(sk, ska)
+#define SAVE_DESTRUCTOR(sk, ska)	(ska)->save_sk_destruct = (sk)->so_dtor
+#define RESTORE_DESTRUCTOR(sk, ska)	(sk)->so_dtor = (ska)->save_sk_destruct
 #define SET_DATA_READY(sk, f)	soupcall_set(sk, SO_RCV, f, NULL)
-#define SET_DESTRUCTOR(sk, f)
+#define SET_DESTRUCTOR(sk, f)	(sk)->so_dtor = (void *)f
 //#define MBUF_HEADLEN(m)	((m)->m_pkthdr.len)
 #define MBUF_HEADLEN(m)	((m)->m_len)
 #endif /* WITH_STACK */
@@ -1158,7 +1157,9 @@ struct netmap_stack_adapter {
 	//NM_LIST_HEAD sk_adapters;
 	int (*save_reg)(struct netmap_adapter *na, int onoff);
 	void *save_sk_data_ready;
+#ifdef linux
 	struct net_device_ops stack_ndo;
+#endif /* linux */
 	struct nm_st_sk_adapter **sk_adapters;
 #define DEFAULT_SK_ADAPTERS	65535
 	u_int sk_adapters_max;
