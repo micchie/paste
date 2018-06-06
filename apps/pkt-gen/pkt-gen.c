@@ -3101,7 +3101,7 @@ main(int arc, char **argv)
 		D("Unable to open %s: %s", g.ifname, strerror(errno));
 		goto out;
 	}
-	if (!strncmp(g.ifname, "stack", 5)) {
+	if (!strncmp(g.ifname, "stack", 5) && g.transport) {
 		struct sockaddr_storage ss;
 		struct sockaddr_in *sin = (struct sockaddr_in *)&ss;
 		int on = 1;
