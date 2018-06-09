@@ -163,9 +163,9 @@ struct hrtimer {
 #define SAVE_DATA_READY(sk, ska)
 #define RESTORE_DATA_READY(sk, ska)    soupcall_clear(sk, SO_RCV)
 #define SAVE_DESTRUCTOR(sk, ska)	(ska)->save_sk_destruct = (sk)->so_dtor
-#define RESTORE_DESTRUCTOR(sk, ska)	(sk)->so_dtor = (ska)->save_sk_destruct
+#define RESTORE_DESTRUCTOR(sk, ska)	sodtor_set(sk, (ska)->save_sk_destruct)
 #define SET_DATA_READY(sk, f)	soupcall_set(sk, SO_RCV, f, NULL)
-#define SET_DESTRUCTOR(sk, f)	(sk)->so_dtor = (void *)f
+#define SET_DESTRUCTOR(sk, f)	sodtor_set(sk, f)
 //#define MBUF_HEADLEN(m)	((m)->m_pkthdr.len)
 #define MBUF_HEADLEN(m)	((m)->m_len)
 #endif /* WITH_STACK */
