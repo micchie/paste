@@ -943,18 +943,16 @@ nm_os_st_data_ready(NM_SOCK_T *so, void *x, int y)
 	if (unlikely(!sbavail(sb))) {
 		return 0;
 	}
-	KASSERT(sb->sb_mb != NULL, ("NULL sb->sb_mb while sbavail()"));
 	m = sb->sb_mb;
 	scb = NMCB(m);
 	if (nm_st_cb_valid(scb)) {
-		struct netmap_kring *kring = scb_kring(scb);
-		kring->nkr_leases = (void *)so;
+		scb_kring(scb)->nkr_leases = (void *)so;
 	}
 	return 0;
 }
 
 static int
-__data_ready(struct nm_st_cb *scb)
+freebsd_data_ready(struct nm_st_cb *scb)
 {
 	NM_SOCK_T *so;
 	struct mbuf *m0 = NULL, *m, *tmp;
@@ -980,7 +978,7 @@ __data_ready(struct nm_st_cb *scb)
 	bzero(&uio, sizeof(uio));
 	uio.uio_resid = rlen;
 	error = soreceive(so, NULL, &uio, &m0, NULL, &flags);
-	if (error) {
+	if (unlikely(error)) {
 		D("error on soreceive() (%d)", error);
 		return error;
 	}
@@ -1015,11 +1013,9 @@ __data_ready(struct nm_st_cb *scb)
 		ND("scb %p kring %p slot %p slot->offset %u slot->len %u",
 				scb, kring, slot, slot->offset, slot->len);
 		nm_st_add_fdtable(scb, kring);
-
 		nm_st_cb_wstate(scb, SCB_M_TXREF);
 		m_free(m);
 	}
-	//m_freem(m0);
 	return 0;
 }
 
@@ -1052,21 +1048,18 @@ nm_os_st_sb_drain(struct netmap_adapter *na, NM_SOCK_T *so)
 {
 	struct mbuf * m;
 	struct nm_st_cb *scb;
-	//struct netmap_kring *kring, *dst_kring;
 
 	if (!sbavail(&so->so_rcv))
 		return;
 	m = so->so_rcv.sb_mb;
 	scb = NMCB_EXT(m, 0, NETMAP_BUF_SIZE(na));
-	ND("m %p m_data %p scb 0x%x",
-		m, m->m_data, nm_st_cb_rstate(scb));
 	if (!nm_st_cb_valid(scb)) {
 		D("invalid scb");
 		return;
 	}
 	ND("next nm_os_st_data_ready (SCB %p %d", scb, nm_st_cb_rstate(scb));
 	nm_os_st_data_ready(so, NULL, 0);
-	__data_ready(scb);
+	freebsd_data_ready(scb);
 }
 
 #if 0
@@ -1143,7 +1136,7 @@ nm_os_st_recv(struct netmap_kring *kring, struct netmap_slot *slot)
 	nm_st_cb_wstate(scb, SCB_M_STACK);
 	na->if_input(ifp, m);
 
-	__data_ready(scb);
+	freebsd_data_ready(scb);
 
 	if (unlikely(nm_st_cb_rstate(scb) == SCB_M_STACK)) {
 		nm_st_cb_wstate(scb, SCB_M_QUEUED);
@@ -1188,6 +1181,7 @@ nm_os_st_send(struct netmap_kring *kring, struct netmap_slot *slot)
 
 	ND("m %p ext_buf %p m_data %p scb %p slot off %u len %u fd %d", m, m->m_ext.ext_buf, m->m_data, scb, slot->offset, slot->len, slot->fd);
 	ska = nm_st_ska_from_fd(na, slot->fd);
+	ND("ska %p ska->sk %p", ska, ska ? ska->sk : NULL);
 	err = sosend(ska->sk, NULL, NULL, m, NULL, flags, curthread);
 	if (unlikely(err < 0)) {
 		D("error %d", err);

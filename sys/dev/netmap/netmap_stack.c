@@ -52,6 +52,7 @@
 
 #elif defined(linux)
 #include "bsd_glue.h"
+#define ENOTSUP ENOTSUPP
 #else
 #error Unsupported platform
 #endif /* unsupported */
@@ -203,7 +204,7 @@ nm_st_extra_enqueue(struct netmap_kring *kring, struct netmap_slot *slot)
 	else // not the last one
 		slots[extra->prev].next = NM_EXT_NULL;
 
-	/* apend to busy list */
+	/* append to busy list */
 	extra->next = NM_EXT_NULL;
 	if (pool->busy == NM_EXT_NULL) {
 		pool->busy = pos;
@@ -570,7 +571,7 @@ nombq(struct netmap_adapter *na, struct mbuf *m)
 #ifdef __FreeBSD__
 /* FreeBSD doesn't have protocol header offsets filled */
 static inline void
-__mbuf_proto_headers(struct mbuf *m)
+mbuf_proto_headers(struct mbuf *m)
 {
 	uint16_t ethertype;
 
@@ -581,7 +582,7 @@ __mbuf_proto_headers(struct mbuf *m)
 	m->m_pkthdr.l3hlen = sizeof(struct nm_iphdr);
 }
 #else
-#define __mbuf_proto_headers(m)
+#define mbuf_proto_headers(m)
 #endif /* __FreeBSD__ */
 
 static void
@@ -592,7 +593,7 @@ csum_transmit(struct netmap_adapter *na, struct mbuf *m)
 		char *th;
 		uint16_t *check;
 
-		__mbuf_proto_headers(m);
+		mbuf_proto_headers(m);
 		iph = (struct nm_iphdr *)MBUF_NETWORK_HEADER(m);
 		KASSERT(iph != NULL, ("NULL iph"));
 		th = MBUF_TRANSPORT_HEADER(m);
@@ -711,7 +712,7 @@ nm_st_transmit(struct ifnet *ifp, struct mbuf *m)
 		uint16_t *check;
 		int len, v = na->virt_hdr_len;
 
-		__mbuf_proto_headers(m);
+		mbuf_proto_headers(m);
 		iph = (struct nm_iphdr *)(nmb + v + MBUF_NETWORK_OFFSET(m));
 		tcph = (struct nm_tcphdr *)(nmb + v + MBUF_TRANSPORT_OFFSET(m));
 		check = &tcph->check;
@@ -894,6 +895,11 @@ netmap_stack_bwrap_reg(struct netmap_adapter *na, int onoff)
 	struct netmap_hw_adapter *hw = (struct netmap_hw_adapter *)hwna;
 #endif
 	int error;
+
+	if (bna->up.na_bdg->bdg_active_ports > 3) {
+		D("%s: stack port so far supports only one NIC", na->name);
+		return ENOTSUP;
+	}
 
 	/* DMA offset */
 	na->virt_hdr_len = bna->up.na_bdg->bdg_ports[0]->up.virt_hdr_len;
@@ -1141,17 +1147,15 @@ static int
 netmap_stack_reg(struct netmap_adapter *na, int onoff)
 {
 	struct netmap_vp_adapter *vpna = (struct netmap_vp_adapter *)na;
-	int err;
-
-	err = netmap_vp_reg(na, onoff);
-	if (err)
-		return err;
 
 	if (onoff) {
+		int err;
+
 		if (na->active_fds > 0) {
 			return 0;
 		}
-		if (nm_st_extra_alloc(na)) {
+		err = nm_st_extra_alloc(na);
+		if (err) {
 			return err;
 		}
 		na->virt_hdr_len = sizeof(struct nm_st_cb);
@@ -1165,8 +1169,6 @@ netmap_stack_reg(struct netmap_adapter *na, int onoff)
 			struct netmap_vp_adapter *slave;
 			struct nmreq_header hdr;
 			struct nmreq_port_hdr req;
-			//struct nmreq_bdg_attach *req =
-			 //   (struct nmreq_bdg_attach *)(uintptr_t)hdr.nr_body;
 
 			if (i == 0)
 				continue;
