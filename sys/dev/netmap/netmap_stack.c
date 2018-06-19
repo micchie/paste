@@ -135,19 +135,28 @@ struct nm_st_extra_pool {
 void
 nm_st_extra_dequeue(struct netmap_kring *kring, struct netmap_slot *slot)
 {
-	struct netmap_ring *ring = kring->ring;
-	struct nm_st_extra_pool *pool = kring->extra;
+	struct netmap_ring *ring;
+	struct nm_st_extra_pool *pool;
 	struct nm_st_extra_slot *slots, *extra;
 	u_int pos;
 
+	/* XXX raising mbuf might have been orphaned */
+	if (unlikely(kring->nr_mode != NKR_NETMAP_ON)) {
+		RD(1, "not NKR_NETMAP_ON");
+		return;
+	}
+	pool = kring->extra;
 	if (unlikely(!pool)) {
 		RD(1, "kring->extra has gone");
 		return;
-	} else if (unlikely(!pool->num)) {
+	}
+	if (unlikely(!pool->num)) {
 		RD(1, "extra slots have gone");
 		return;
 	}
+
 	slots = pool->slots;
+	ring = kring->ring;
 	/* nothing to do if I am on the ring */
 	if ((uintptr_t)slot >= (uintptr_t)ring->slot &&
 	    (uintptr_t)slot < (uintptr_t)(ring->slot + kring->nkr_num_slots)) {
