@@ -1918,9 +1918,11 @@ netmap_bwrap_krings_create(struct netmap_adapter *na)
 	return 0;
 
 err_dec_users:
-        for_rx_tx(t) {
-		NMR(hwna, t)[i]->users--;
-        }
+	for_rx_tx(t) {
+		for (i = 0; i < netmap_all_rings(hwna, t); i++) {
+			NMR(hwna, t)[i]->users--;
+		}
+	}
 	hwna->nm_krings_delete(hwna);
 err_del_vp_rings:
 	netmap_vp_krings_delete(na);
