@@ -1262,8 +1262,7 @@ ping_body(void *data)
 	uint64_t buckets[64];	/* bins for delays, ns */
 	int rate_limit = targ->g->tx_rate, tosend = 0;
 
-	frame = &targ->pkt;
-	*((char **)frame) += sizeof(targ->pkt.vh) - targ->g->virt_header;
+	frame = (char*)&targ->pkt + sizeof(targ->pkt.vh) - targ->g->virt_header;
 	size = targ->g->pkt_size + targ->g->virt_header;
 
 
@@ -1537,8 +1536,7 @@ sender_body(void *data)
 	int size;
 
 	if (targ->frame == NULL) {
-		frame = pkt;
-		*((char **)frame) += sizeof(pkt->vh) - targ->g->virt_header;
+		frame = (char *)pkt + sizeof(pkt->vh) - targ->g->virt_header;
 		size = targ->g->pkt_size + targ->g->virt_header;
 	} else {
 		frame = targ->frame;
@@ -1989,8 +1987,7 @@ txseq_body(void *data)
 		D("Ignoring -n argument");
 	}
 
-	frame = pkt;
-	*((char **)frame) += sizeof(pkt->vh) - targ->g->virt_header;
+	frame = (char *)pkt + sizeof(pkt->vh) - targ->g->virt_header;
 	size = targ->g->pkt_size + targ->g->virt_header;
 
 	D("start, fd %d main_fd %d", targ->fd, targ->g->main_fd);
