@@ -1178,7 +1178,7 @@ send_packets(struct netmap_ring *ring, struct pkt *pkt, void *frame,
 				slot->offset = g->soff;
 				slot->fd = g->sfd;
 			}
-			nm_pkt_copy(frame + o, p + o, size - o);
+			nm_pkt_copy(frame + g->soff, p + o, size - g->soff);
 			if (fcnt == nfrags)
 				update_addresses(pkt, g);
 		} else if (options & OPT_MEMCPY) {
@@ -1653,6 +1653,20 @@ sender_body(void *data)
 				D("not connected yet");
 				continue;
 			} else {
+				struct glob_arg *g = targ->g;
+				struct nm_ifreq ifreq;
+				char *p;
+
+				bzero(&ifreq, sizeof(ifreq));
+				p = g->ifname;
+				strncpy(ifreq.nifr_name, p, strlen(p));
+				D("connected, registering %s", p);
+				memcpy(ifreq.data, &pfd[1].fd, sizeof(int));
+				if (ioctl(g->nmd->fd, NIOCCONFIG, &ifreq)) {
+					perror("ioctl");
+					close(pfd[1].fd);
+					goto quit;
+				}
 				pfd[1].fd = 0;
 			}
 		}

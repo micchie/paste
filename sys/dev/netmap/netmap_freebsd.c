@@ -1185,6 +1185,9 @@ nm_os_st_send(struct netmap_kring *kring, struct netmap_slot *slot)
 
 	ND("m %p ext_buf %p m_data %p scb %p slot off %u len %u fd %d", m, m->m_ext.ext_buf, m->m_data, scb, slot->offset, slot->len, slot->fd);
 	ska = nm_st_ska_from_fd(na, slot->fd);
+	if (unlikely(!ska)) {
+		D("no ska for fd %d (na %s)", slot->fd, na->name);
+	}
 	ND("ska %p ska->sk %p", ska, ska ? ska->sk : NULL);
 	err = sosend(ska->sk, NULL, NULL, m, NULL, flags, curthread);
 	if (unlikely(err < 0)) {
