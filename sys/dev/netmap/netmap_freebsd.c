@@ -1101,6 +1101,10 @@ nm_os_st_mbuf_data_destructor(struct mbuf *m)
 {
 	struct nm_st_cb *scb = NMCB(m);
 
+	if (unlikely(nm_st_cb_gone(scb))) {
+		RD(1, "scb gone");
+		return;
+	}
 	nm_st_cb_wstate(scb, SCB_M_NOREF);
 	nm_st_extra_dequeue(scb_kring(scb), scb_slot(scb));
 	//__get_page(M_START(m), 2048, 1);

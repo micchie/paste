@@ -1189,7 +1189,7 @@ struct nm_st_cb {
 	struct nm_ubuf_info ui; /* ctx keeps kring and desc keeps slot */
 #define SCB_M_MAGIC		0x12345600	/* XXX do better */
 #define SCB_M_MAGIC_MASK	0xffffff00	/* XXX do better */
-#define SCB_GONE		0x00000001
+#define SCB_GONE		0x00000010
 	uint32_t flags;
 	uint32_t next;
 } __attribute__((__packed__)); /* 32 byte */

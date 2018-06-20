@@ -141,6 +141,10 @@ nm_st_extra_dequeue(struct netmap_kring *kring, struct netmap_slot *slot)
 	u_int pos;
 
 	/* XXX raising mbuf might have been orphaned */
+	if (unlikely(kring == NULL)) {
+		RD(1, "no kring");
+		return;
+	}
 	if (unlikely(kring->nr_mode != NKR_NETMAP_ON)) {
 		RD(1, "not NKR_NETMAP_ON");
 		return;
@@ -756,6 +760,7 @@ nm_st_extra_free(struct netmap_adapter *na)
 
 		for (i = 0; i < netmap_real_rings(na, t); i++) {
 			struct netmap_kring *kring = NMR(na, t)[i];
+			struct netmap_ring *ring = kring->ring;
 			struct nm_st_extra_pool *extra;
 			uint32_t j;
 
@@ -776,6 +781,14 @@ nm_st_extra_free(struct netmap_adapter *na)
 			if (extra->slots)
 				nm_os_free(extra->slots);
 			nm_os_free(extra);
+
+			/* also mark on-ring bufs */
+			for (j = 0; j < kring->nkr_num_slots; j++) {
+				struct nm_st_cb *scb;
+
+				scb = NMCB_BUF(NMB(na, &ring->slot[j]));
+				nm_st_cb_set_gone(scb);
+			}
 		}
 	}
 }
@@ -903,26 +916,26 @@ netmap_stack_bwrap_reg(struct netmap_adapter *na, int onoff)
 #ifdef linux
 	struct netmap_hw_adapter *hw = (struct netmap_hw_adapter *)hwna;
 #endif
-	int error;
-
-	if (bna->up.na_bdg->bdg_active_ports > 3) {
-		D("%s: stack port so far supports only one NIC", na->name);
-		return ENOTSUP;
-	}
-
-	/* DMA offset */
-	na->virt_hdr_len = bna->up.na_bdg->bdg_ports[0]->up.virt_hdr_len;
-	hwna->virt_hdr_len = na->virt_hdr_len;
-	if (hwna->na_flags & NAF_HOST_RINGS) {
-		bna->host.up.virt_hdr_len = hwna->virt_hdr_len;
-	}
-
-	error = netmap_bwrap_reg(na, onoff);
-	if (error)
-		return error;
 
 	if (onoff) {
-		int i;
+		int i, error;
+
+		if (bna->up.na_bdg->bdg_active_ports > 3) {
+			D("%s: stack port at this point supports only one NIC",
+					na->name);
+			return ENOTSUP;
+		}
+
+		/* DMA offset */
+		na->virt_hdr_len = bna->up.na_bdg->bdg_ports[0]->up.virt_hdr_len;
+		hwna->virt_hdr_len = na->virt_hdr_len;
+		if (hwna->na_flags & NAF_HOST_RINGS) {
+			bna->host.up.virt_hdr_len = hwna->virt_hdr_len;
+		}
+
+		error = netmap_bwrap_reg(na, onoff);
+		if (error)
+			return error;
 
 		if (nm_st_extra_alloc(na)) {
 			D("extra_alloc failed for slave");
@@ -960,10 +973,11 @@ netmap_stack_bwrap_reg(struct netmap_adapter *na, int onoff)
 #endif
 		nm_st_mbufpool_free(na);
 		nm_st_extra_free(na);
+		return netmap_bwrap_reg(na, onoff);
 	}
-	return error;
-//	return netmap_bwrap_reg(na, onoff);
+	return 0;
 }
+
 
 static int
 netmap_stack_bwrap_intr_notify(struct netmap_kring *kring, int flags) {
@@ -1190,6 +1204,8 @@ netmap_stack_reg(struct netmap_adapter *na, int onoff)
 			hdr.nr_body = (uintptr_t)&req;
 			nm_bdg_ctl_detach_locked(&hdr, NULL);
 		}
+
+		nm_st_extra_free(na);
 	}
 	return netmap_vp_reg(na, onoff);
 }
