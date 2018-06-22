@@ -1722,8 +1722,13 @@ sender_body(void *data)
 
 	/* final part: wait all the TX queues to be empty. */
 	for (i = targ->nmd->first_tx_ring; i <= targ->nmd->last_tx_ring; i++) {
+		int retry = 0;
 		txring = NETMAP_TXRING(nifp, i);
-		while (!targ->cancel && nm_tx_pending(txring)) {
+
+		if (targ->g->sfd) {
+			retry = 20;
+		}
+		while ((!targ->cancel && nm_tx_pending(txring)) || retry--) {
 			D("pending tx tail %d head %d on ring %d",
 				txring->tail, txring->head, i);
 			/* stack port might need to process incoming packets 
@@ -1734,6 +1739,8 @@ sender_body(void *data)
 			else
 				ioctl(pfd[0].fd, NIOCTXSYNC, NULL);
 			usleep(1); /* wait 1 tick */
+			if (retry)
+				usleep(1000);
 		}
 	}
     } /* end DEV_NETMAP */

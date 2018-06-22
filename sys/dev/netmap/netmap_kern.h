@@ -168,6 +168,7 @@ struct hrtimer {
 #define SET_DESTRUCTOR(sk, f)	sodtor_set(sk, f)
 //#define MBUF_HEADLEN(m)	((m)->m_pkthdr.len)
 #define MBUF_HEADLEN(m)	((m)->m_len)
+#define VHLEN(_na)	((_na)->virt_hdr_len)
 #endif /* WITH_STACK */
 
 #elif defined (linux)

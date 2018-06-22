@@ -1024,6 +1024,7 @@ nm_os_generic_set_features(struct netmap_generic_adapter *gna)
 #endif /* WITH_GENERIC */
 
 #ifdef WITH_STACK
+
 netdev_tx_t
 linux_st_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
@@ -1107,7 +1108,7 @@ nm_os_st_data_ready(NM_SOCK_T *sk)
 		}
 		slot->fd = nm_st_sk(m->sk)->fd;
 		slot->len = skb_headroom(m) + skb_headlen(m);
-		slot->offset = skb_headroom(m) - kring->na->virt_hdr_len; // XXX
+		slot->offset = skb_headroom(m) - VHLEN(kring->na); // XXX
 		nm_st_add_fdtable(scb, kring);
 		/* see comment in nm_st_transmit() */
 #ifdef STACK_RECYCLE
@@ -1203,8 +1204,8 @@ nm_os_build_mbuf(struct netmap_kring *kring, char *buf, u_int len)
 #endif
 	page = virt_to_page(buf);
 	get_page(page); // survive __kfree_skb()
-	skb_reserve(m, na->virt_hdr_len); // m->data and tail
-	skb_put(m, len - na->virt_hdr_len); // advance m->tail and m->len
+	skb_reserve(m, VHLEN(na)); // m->data and tail
+	skb_put(m, len - VHLEN(na)); // advance m->tail and m->len
 	return m;
 }
 
@@ -1220,7 +1221,7 @@ nm_os_st_recv(struct netmap_kring *kring, struct netmap_slot *slot)
 	struct mbuf *m;
 	int ret = 0;
 
-	slot->len += na->virt_hdr_len; // Ugly to do here...
+	slot->len += VHLEN(na); // Ugly to do here...
 
 	m = nm_os_build_mbuf(kring, nmb, slot->len);
 	if (unlikely(!m))
@@ -1295,8 +1296,8 @@ nm_os_st_send(struct netmap_kring *kring, struct netmap_slot *slot)
 	page = virt_to_page(nmb);
 	get_page(page); // survive __kfree_skb()
 	pageref = page_ref_count(page);
-	poff = nmb - page_to_virt(page) + na->virt_hdr_len + slot->offset;
-	len = slot->len - na->virt_hdr_len - slot->offset;
+	poff = nmb - page_to_virt(page) + VHLEN(na) + slot->offset;
+	len = slot->len - VHLEN(na) - slot->offset;
 	scb = NMCB_BUF(nmb);
 	nm_st_cb_wstate(scb, SCB_M_STACK);
 

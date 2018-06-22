@@ -497,6 +497,11 @@ nm_st_preflush(struct netmap_kring *kring)
 		if (unlikely(slot->len == 0)) {
 			continue;
 		}
+		if (unlikely(slot->len < VHLEN(na) + slot->offset)) {
+			RD(1, "invalid data: len %u virt_hdr_len %u off %u",
+				slot->len, VHLEN(na), slot->offset);
+			continue;
+		}
 		scb = NMCB_BUF(nmb);
 		scbw(scb, kring, slot);
 		error = tx ? nm_os_st_send(kring, slot) :
@@ -565,7 +570,7 @@ nombq(struct netmap_adapter *na, struct mbuf *m)
 		return ENXIO;
 	}
 	hslot = &kring->ring->slot[nm_i];
-	m_copydata(m, 0, len, (char *)NMB(na, hslot) + na->virt_hdr_len);
+	m_copydata(m, 0, len, (char *)NMB(na, hslot) + VHLEN(na));
 	hslot->len = len;
 	kring->nr_hwtail = nm_next(nm_i, lim);
 
@@ -710,12 +715,13 @@ nm_st_transmit(struct ifnet *ifp, struct mbuf *m)
 	   MBUF_HEADLEN(m), MBUF_HEADLEN(md), m->m_len, m->m_pkthdr.len,
 	   m->m_pkthdr.l2hlen, m->m_pkthdr.l3hlen, m->m_pkthdr.l4hlen,
 	   ntohs(*(uint16_t *)(m->m_data + 12)), slot->len, slot->offset,
-	   na->virt_hdr_len, nm_os_mbuf_has_offld(m), mismatch);
+	   VHLEN(na), nm_os_mbuf_has_offld(m), mismatch);
+
 	if (!mismatch) {
 		/* Length has already been validated */
-		memcpy(nmb + na->virt_hdr_len, MBUF_DATA(m), slot->offset);
+		memcpy(nmb + VHLEN(na), MBUF_DATA(m), slot->offset);
 	} else {
-		m_copydata(m, 0, MBUF_LEN(m), nmb + na->virt_hdr_len);
+		m_copydata(m, 0, MBUF_LEN(m), nmb + VHLEN(na));
 		slot->len += mismatch;
 	}
 
@@ -723,7 +729,7 @@ nm_st_transmit(struct ifnet *ifp, struct mbuf *m)
 		struct nm_iphdr *iph;
 		struct nm_tcphdr *tcph;
 		uint16_t *check;
-		int len, v = na->virt_hdr_len;
+		int len, v = VHLEN(na);
 
 		mbuf_proto_headers(m);
 		iph = (struct nm_iphdr *)(nmb + v + MBUF_NETWORK_OFFSET(m));
@@ -927,10 +933,10 @@ netmap_stack_bwrap_reg(struct netmap_adapter *na, int onoff)
 		}
 
 		/* DMA offset */
-		na->virt_hdr_len = bna->up.na_bdg->bdg_ports[0]->up.virt_hdr_len;
-		hwna->virt_hdr_len = na->virt_hdr_len;
+		VHLEN(na) = VHLEN(&bna->up.na_bdg->bdg_ports[0]->up);
+		VHLEN(hwna) = VHLEN(na);
 		if (hwna->na_flags & NAF_HOST_RINGS) {
-			bna->host.up.virt_hdr_len = hwna->virt_hdr_len;
+			VHLEN(&bna->host.up) = VHLEN(hwna);
 		}
 
 		error = netmap_bwrap_reg(na, onoff);
@@ -1181,7 +1187,7 @@ netmap_stack_reg(struct netmap_adapter *na, int onoff)
 		if (err) {
 			return err;
 		}
-		na->virt_hdr_len = sizeof(struct nm_st_cb);
+		VHLEN(na) = sizeof(struct nm_st_cb);
 	}
 	if (!onoff) {
 		struct nm_bridge *b = vpna->na_bdg;
@@ -1319,14 +1325,13 @@ netmap_get_stack_na(struct nmreq_header *hdr, struct netmap_adapter **na,
 	if (ret == 0 && *na) {
 		struct netmap_vp_adapter *vpna =
 			(struct netmap_vp_adapter *)(*na);
-		vpna->up.virt_hdr_len = sizeof(struct nm_st_cb);
+		VHLEN(&vpna->up) = sizeof(struct nm_st_cb);
 		if (nm_is_bwrap(*na)) {
 			struct netmap_bwrap_adapter *bna =
 				(struct netmap_bwrap_adapter *)(*na);
-			bna->hwna->virt_hdr_len = vpna->up.virt_hdr_len;
+			VHLEN(bna->hwna) = VHLEN(&vpna->up);
 			if (bna->hwna->na_flags & NAF_HOST_RINGS) {
-				bna->host.up.virt_hdr_len =
-					vpna->up.virt_hdr_len;
+				VHLEN(&bna->host.up) = VHLEN(&vpna->up);
 			}
 		}
 	}

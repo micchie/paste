@@ -1007,9 +1007,9 @@ freebsd_data_ready(struct nm_st_cb *scb)
 		}
 		slot->fd = nm_st_sk(so)->fd;
 		/* m_data points payload */
-		slot->offset = m->m_data - M_START(m) - kring->na->virt_hdr_len;
+		slot->offset = m->m_data - M_START(m) - VHLEN(kring->na);
 		/* XXX just leave the original ? */
-		slot->len = m->m_len + slot->offset + kring->na->virt_hdr_len;
+		slot->len = m->m_len + slot->offset + VHLEN(kring->na);
 		ND("scb %p kring %p slot %p slot->offset %u slot->len %u",
 				scb, kring, slot, slot->offset, slot->len);
 		nm_st_add_fdtable(scb, kring);
@@ -1120,7 +1120,7 @@ nm_os_st_recv(struct netmap_kring *kring, struct netmap_slot *slot)
 	struct mbuf *m;
 	int ret = 0;
 
-	slot->len += na->virt_hdr_len; // Ugly to do here...
+	slot->len += VHLEN(na); // Ugly to do here...
 	m = nm_os_get_mbuf(na->ifp, NETMAP_BUF_SIZE(na));
 	if (unlikely(m == NULL)) {
 		D("no mbuf");
@@ -1134,7 +1134,7 @@ nm_os_st_recv(struct netmap_kring *kring, struct netmap_slot *slot)
 	//SET_MBUF_REFCNT(m, 2);
 	m->m_pkthdr.flowid = kring->ring_id;
 	m->m_pkthdr.rcvif = ifp;
-	m->m_data = nmb + na->virt_hdr_len;
+	m->m_data = nmb + VHLEN(na);
 
 	scbw(scb, kring, slot);
 	nm_st_cb_wstate(scb, SCB_M_STACK);
@@ -1157,16 +1157,10 @@ nm_os_st_send(struct netmap_kring *kring, struct netmap_slot *slot)
 	struct netmap_adapter *na = kring->na;
 	struct nm_st_sk_adapter *ska;
 	struct mbuf *m;
-	//u_int len;
 	char *nmb = NMB(na, slot);
 	int err;
 	struct nm_st_cb *scb = NMCB_BUF(nmb);
 	int flags = MSG_DONTWAIT | MSG_DONTROUTE;
-#if 0
-	vm_page_t page;
-#endif
-
-	//len = slot->len - na->virt_hdr_len; // XXX not substruct virt header?
 
 	/* Link to the external mbuf storage */
 	m = nm_os_get_mbuf(na->ifp, NETMAP_BUF_SIZE(na));
@@ -1176,24 +1170,24 @@ nm_os_st_send(struct netmap_kring *kring, struct netmap_slot *slot)
 	m->m_ext.ext_buf = m->m_data = nmb;
 	m->m_ext.ext_size = slot->len;
 	m->m_ext.ext_free = nm_os_st_mbuf_data_destructor;
-	m->m_len = m->m_pkthdr.len = slot->len - slot->offset - na->virt_hdr_len;
-	m->m_data = nmb + na->virt_hdr_len + slot->offset;
-
-	//page = __get_page((void *)nmb, NETMAP_BUF_SIZE(na), 0);
+	m->m_len = m->m_pkthdr.len = slot->len - slot->offset - VHLEN(na);
+	m->m_data = nmb + VHLEN(na) + slot->offset;
 
 	nm_st_cb_wstate(scb, SCB_M_STACK);
 
-	ND("m %p ext_buf %p m_data %p scb %p slot off %u len %u fd %d", m, m->m_ext.ext_buf, m->m_data, scb, slot->offset, slot->len, slot->fd);
+	ND("m %p ext_buf %p data %p scb %p slot off %u len %u fd %d", m,
+	    m->m_ext.ext_buf, m->m_data, scb, slot->offset, slot->len, slot->fd);
 	ska = nm_st_ska_from_fd(na, slot->fd);
 	if (unlikely(!ska)) {
 		D("no ska for fd %d (na %s)", slot->fd, na->name);
+		return 0;
 	}
-	ND("ska %p ska->sk %p", ska, ska ? ska->sk : NULL);
 	err = sosend(ska->sk, NULL, NULL, m, NULL, flags, curthread);
 	if (unlikely(err < 0)) {
 		D("error %d", err);
 		nm_st_cb_invalidate(scb);
 	}
+	ND("m %p scb %p 0x%x", m, scb, nm_st_cb_rstate(scb));
 
 	if (unlikely(nm_st_cb_rstate(scb) == SCB_M_STACK)) {
 		nm_st_cb_wstate(scb, SCB_M_QUEUED);
@@ -1203,7 +1197,6 @@ nm_os_st_send(struct netmap_kring *kring, struct netmap_slot *slot)
 	}
 	return 0;
 }
-
 #endif /* WITH_STACK */
 
 /*
