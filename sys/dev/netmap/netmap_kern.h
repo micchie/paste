@@ -1173,10 +1173,10 @@ struct netmap_stack_adapter {
  * after 1520 data+headroom
  */
 enum {
-	SCB_M_STACK=1,
-	SCB_M_QUEUED,
-	SCB_M_TXREF,
-	SCB_M_NOREF,
+	MB_STACK=1,
+	MB_QUEUED,
+	MB_TXREF,
+	MB_NOREF,
 };
 
 #if defined(__FreeBSD__)
@@ -1188,8 +1188,8 @@ struct nm_ubuf_info {
 
 struct nm_st_cb {
 	struct nm_ubuf_info ui; /* ctx keeps kring and desc keeps slot */
-#define SCB_M_MAGIC		0x12345600	/* XXX do better */
-#define SCB_M_MAGIC_MASK	0xffffff00	/* XXX do better */
+#define MB_MAGIC		0x12345600	/* XXX do better */
+#define MB_MAGIC_MASK	0xffffff00	/* XXX do better */
 #define SCB_GONE		0x00000010
 	uint32_t flags;
 	uint32_t next;
@@ -1197,7 +1197,7 @@ struct nm_st_cb {
 static inline void
 nm_st_cb_wstate(struct nm_st_cb *scb, u_int newstate)
 {
-	scb->flags = (SCB_M_MAGIC | newstate);
+	scb->flags = (MB_MAGIC | newstate);
 }
 
 static inline void
@@ -1209,7 +1209,7 @@ nm_st_cb_invalidate(struct nm_st_cb *scb)
 static inline int
 nm_st_cb_valid(struct nm_st_cb *scb)
 {
-	return ((scb->flags & SCB_M_MAGIC_MASK) == SCB_M_MAGIC);
+	return ((scb->flags & MB_MAGIC_MASK) == MB_MAGIC);
 }
 
 static inline int
@@ -1234,7 +1234,7 @@ static inline int
 nm_st_cb_rstate(struct nm_st_cb *scb)
 {
 	return likely(nm_st_cb_valid(scb)) ?
-		(scb->flags & ~SCB_M_MAGIC_MASK) : 0;
+		(scb->flags & ~MB_MAGIC_MASK) : 0;
 }
 
 NM_SOCK_T *nm_os_sock_fget(int, void **);

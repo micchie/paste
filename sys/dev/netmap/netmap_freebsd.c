@@ -1013,7 +1013,7 @@ freebsd_data_ready(struct nm_st_cb *scb)
 		ND("scb %p kring %p slot %p slot->offset %u slot->len %u",
 				scb, kring, slot, slot->offset, slot->len);
 		nm_st_add_fdtable(scb, kring);
-		nm_st_cb_wstate(scb, SCB_M_TXREF);
+		nm_st_cb_wstate(scb, MB_TXREF);
 		m_free(m);
 	}
 	return 0;
@@ -1105,7 +1105,7 @@ nm_os_st_mbuf_data_destructor(struct mbuf *m)
 		RD(1, "scb gone");
 		return;
 	}
-	nm_st_cb_wstate(scb, SCB_M_NOREF);
+	nm_st_cb_wstate(scb, MB_NOREF);
 	nm_st_extra_dequeue(scb_kring(scb), scb_slot(scb));
 	//__get_page(M_START(m), 2048, 1);
 }
@@ -1137,13 +1137,13 @@ nm_os_st_recv(struct netmap_kring *kring, struct netmap_slot *slot)
 	m->m_data = nmb + VHLEN(na);
 
 	scbw(scb, kring, slot);
-	nm_st_cb_wstate(scb, SCB_M_STACK);
+	nm_st_cb_wstate(scb, MB_STACK);
 	na->if_input(ifp, m);
 
 	freebsd_data_ready(scb);
 
-	if (unlikely(nm_st_cb_rstate(scb) == SCB_M_STACK)) {
-		nm_st_cb_wstate(scb, SCB_M_QUEUED);
+	if (unlikely(nm_st_cb_rstate(scb) == MB_STACK)) {
+		nm_st_cb_wstate(scb, MB_QUEUED);
 		if (nm_st_extra_enqueue(kring, slot)) {
 			ret = -EBUSY;
 		}
@@ -1173,7 +1173,7 @@ nm_os_st_send(struct netmap_kring *kring, struct netmap_slot *slot)
 	m->m_len = m->m_pkthdr.len = slot->len - slot->offset - VHLEN(na);
 	m->m_data = nmb + VHLEN(na) + slot->offset;
 
-	nm_st_cb_wstate(scb, SCB_M_STACK);
+	nm_st_cb_wstate(scb, MB_STACK);
 
 	ND("m %p ext_buf %p data %p scb %p slot off %u len %u fd %d", m,
 	    m->m_ext.ext_buf, m->m_data, scb, slot->offset, slot->len, slot->fd);
@@ -1189,8 +1189,8 @@ nm_os_st_send(struct netmap_kring *kring, struct netmap_slot *slot)
 	}
 	ND("m %p scb %p 0x%x", m, scb, nm_st_cb_rstate(scb));
 
-	if (unlikely(nm_st_cb_rstate(scb) == SCB_M_STACK)) {
-		nm_st_cb_wstate(scb, SCB_M_QUEUED);
+	if (unlikely(nm_st_cb_rstate(scb) == MB_STACK)) {
+		nm_st_cb_wstate(scb, MB_QUEUED);
 		if (likely(nm_st_extra_enqueue(kring, slot))) {
 			return -EBUSY;
 		}

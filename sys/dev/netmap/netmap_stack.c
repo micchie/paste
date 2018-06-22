@@ -370,7 +370,7 @@ nm_st_flush(struct netmap_kring *kring)
 			struct nm_st_cb *scb = NMCB_BUF(NMB(rxna, slot));
 
 			if (nm_st_cb_valid(scb) &&
-			    nm_st_cb_rstate(scb) != SCB_M_NOREF)
+			    nm_st_cb_rstate(scb) != MB_NOREF)
 				break;
 		}
 		howmany += n;
@@ -422,7 +422,7 @@ nm_st_flush(struct netmap_kring *kring)
 					D("null ts %p next %u", ts, next);
 					goto skip;
 				}
-				if (nm_st_cb_rstate(scb) == SCB_M_TXREF) {
+				if (nm_st_cb_rstate(scb) == MB_TXREF) {
 					nonfree[nonfree_num++] = j;
 				}
 				scbw(scb, rxkring, rs);
@@ -530,7 +530,7 @@ nm_st_preflush(struct netmap_kring *kring)
 			scb = NMCB_BUF(NMB(na, slot));
 			/* scb can be invalid due to new buffer swap-ed in */
 			if (nm_st_cb_valid(scb) &&
-			    nm_st_cb_rstate(scb) != SCB_M_NOREF)
+			    nm_st_cb_rstate(scb) != MB_NOREF)
 				break;
 		}
 		k = j;
@@ -672,7 +672,7 @@ nm_st_transmit(struct ifnet *ifp, struct mbuf *m)
 	}
 #endif /* linux */
 
-	if (unlikely(nm_st_cb_rstate(scb) != SCB_M_STACK) ||
+	if (unlikely(nm_st_cb_rstate(scb) != MB_STACK) ||
 	    /* FreeBSD ARP reply recycles the request mbuf */
 	    unlikely(scb_kring(scb) &&
 	    scb_kring(scb)->na->na_private == na->na_private)) {
@@ -682,7 +682,7 @@ nm_st_transmit(struct ifnet *ifp, struct mbuf *m)
 	}
 	/* Valid scb, txsync-ing packet. */
 	slot = scb_slot(scb);
-	if (unlikely(nm_st_cb_rstate(scb) == SCB_M_QUEUED)) {
+	if (unlikely(nm_st_cb_rstate(scb) == MB_QUEUED)) {
 	       	/* originated by netmap but has been queued in either extra
 		 * or txring slot. The backend might drop this packet.
 		 */
@@ -692,7 +692,7 @@ nm_st_transmit(struct ifnet *ifp, struct mbuf *m)
 
 		for (i = 0; i < n; i++) {
 			scb2 = NMCB_EXT(m, i, NETMAP_BUF_SIZE(na));
-			nm_st_cb_wstate(scb2, SCB_M_NOREF);
+			nm_st_cb_wstate(scb2, MB_NOREF);
 		}
 #else
 		/* To be done */
@@ -745,7 +745,7 @@ nm_st_transmit(struct ifnet *ifp, struct mbuf *m)
 	/* We don't know when the stack actually releases the data;
 	 * it might holds reference via clone.
 	 */
-	nm_st_cb_wstate(scb, SCB_M_TXREF);
+	nm_st_cb_wstate(scb, MB_TXREF);
 #ifdef linux
 	/* for FreeBSD mbuf comes from our code */
 	nm_set_mbuf_data_destructor(m, &scb->ui,

@@ -1045,10 +1045,10 @@ nm_os_st_mbuf_data_destructor(struct ubuf_info *uarg,
 
 	scb = container_of(u, struct nm_st_cb, ui);
 	if (unlikely(nm_st_cb_gone(scb))) {
-		nm_st_cb_wstate(scb, SCB_M_NOREF); // XXX also clear GONE
+		nm_st_cb_wstate(scb, MB_NOREF); // XXX also clear GONE
 		return;
 	}
-	nm_st_cb_wstate(scb, SCB_M_NOREF);
+	nm_st_cb_wstate(scb, MB_NOREF);
 	nm_st_extra_dequeue(scb_kring(scb), scb_slot(scb));
 }
 
@@ -1112,10 +1112,10 @@ nm_os_st_data_ready(NM_SOCK_T *sk)
 		nm_st_add_fdtable(scb, kring);
 		/* see comment in nm_st_transmit() */
 #ifdef STACK_RECYCLE
-		if (unlikely(nm_st_cb_rstate(scb) == SCB_M_QUEUED))
+		if (unlikely(nm_st_cb_rstate(scb) == MB_QUEUED))
 			queued = 1;
 #endif
-		nm_st_cb_wstate(scb, SCB_M_TXREF);
+		nm_st_cb_wstate(scb, MB_TXREF);
 #ifdef STACK_RECYCLE
 		if (likely(!queued)) {
 			__skb_unlink(m, queue);
@@ -1227,7 +1227,7 @@ nm_os_st_recv(struct netmap_kring *kring, struct netmap_slot *slot)
 	if (unlikely(!m))
 		return 0; // drop and skip
 
-	nm_st_cb_wstate(scb, SCB_M_STACK);
+	nm_st_cb_wstate(scb, MB_STACK);
 	//m->ip_summed = CHECKSUM_UNNECESSARY;
 	m->protocol = eth_type_trans(m, m->dev);
 	/* have orphan() set data_destructor */
@@ -1247,8 +1247,8 @@ nm_os_st_recv(struct netmap_kring *kring, struct netmap_slot *slot)
 	/* setting data destructor is safe only after skb_orphan_frag()
 	 * in __netif_receive_skb_core().
 	 */
-	if (unlikely(nm_st_cb_rstate(scb) == SCB_M_STACK)) {
-		nm_st_cb_wstate(scb, SCB_M_QUEUED);
+	if (unlikely(nm_st_cb_rstate(scb) == MB_STACK)) {
+		nm_st_cb_wstate(scb, MB_QUEUED);
 		if (nm_st_extra_enqueue(kring, slot)) {
 			ret = -EBUSY;
 		}
@@ -1256,7 +1256,7 @@ nm_os_st_recv(struct netmap_kring *kring, struct netmap_slot *slot)
 
 #ifdef STACK_RECYCLE
 	/* XXX avoid refcount_read... */
-	if (nm_st_cb_rstate(scb) == SCB_M_TXREF && likely(!skb_shared(m))) {
+	if (nm_st_cb_rstate(scb) == MB_TXREF && likely(!skb_shared(m))) {
 		/* we can recycle this mbuf (see nm_os_st_data_ready) */
 		struct ubuf_info *uarg = skb_shinfo(m)->destructor_arg;
 
@@ -1299,7 +1299,7 @@ nm_os_st_send(struct netmap_kring *kring, struct netmap_slot *slot)
 	poff = nmb - page_to_virt(page) + VHLEN(na) + slot->offset;
 	len = slot->len - VHLEN(na) - slot->offset;
 	scb = NMCB_BUF(nmb);
-	nm_st_cb_wstate(scb, SCB_M_STACK);
+	nm_st_cb_wstate(scb, MB_STACK);
 
 	err = kernel_sendpage(sk->sk_socket, page, poff, len, MSG_DONTWAIT);
 	if (unlikely(err < 0)) {
@@ -1310,7 +1310,7 @@ nm_os_st_send(struct netmap_kring *kring, struct netmap_slot *slot)
 		return -EAGAIN;
 	}
 
-	if (unlikely(nm_st_cb_rstate(scb) == SCB_M_STACK)) {
+	if (unlikely(nm_st_cb_rstate(scb) == MB_STACK)) {
 		/* The stack might have just dropped a page reference (e.g.,
 		 * linearized in skb_checksum_help() in __dev_queue_xmit().
 		 */
@@ -1319,11 +1319,11 @@ nm_os_st_send(struct netmap_kring *kring, struct netmap_slot *slot)
 			nm_st_cb_invalidate(scb);
 			return 0;
 		}
-		nm_st_cb_wstate(scb, SCB_M_QUEUED);
+		nm_st_cb_wstate(scb, MB_QUEUED);
 		if (likely(nm_st_extra_enqueue(kring, slot))) {
 			return -EBUSY;
 		}
-	} /* usually SCB_M_TXREF (TCP) or SCB_M_NOREF (UDP) */
+	} /* usually MB_TXREF (TCP) or MB_NOREF (UDP) */
 	return 0;
 }
 #endif /* WITH_STACK */
