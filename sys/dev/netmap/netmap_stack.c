@@ -1024,10 +1024,12 @@ nm_st_unregister_socket(struct nm_st_sk_adapter *ska)
 	if (ska->fd >= sna->sk_adapters_max) {
 		D("WARNING: non-registered or invalid fd %d", ska->fd);
 	} else {
+		KASSERT(sk->so_dtor != ska->save_sk_destruct, ("bad restore\n"));
 		sna->sk_adapters[ska->fd] = NULL;
 		NM_SOCK_LOCK(sk);
 		SOCKBUF_LOCK(&sk->so_rcv);
 		RESTORE_DATA_READY(sk, ska);
+		KASSERT(ska->save_sk_destruct == NULL, ("non-NULL save_sk_destruct"));
 		RESTORE_DESTRUCTOR(sk, ska);
 		nm_st_wsk(NULL, sk);
 		SOCKBUF_UNLOCK(&sk->so_rcv);
@@ -1064,15 +1066,15 @@ nm_st_bdg_dtor(const struct netmap_vp_adapter *vpna)
 	if (&vpna->up != nm_st_na(&vpna->up))
 		return;
 
-	//sna = (struct netmap_stack_adapter *)vpna;
 	sna = (struct netmap_stack_adapter *)(void *)(uintptr_t)vpna;
 	for (i = 0; i < sna->sk_adapters_max; i++) {
 		struct nm_st_sk_adapter *ska = sna->sk_adapters[i];
 		if (ska)
 			nm_st_unregister_socket(ska);
 	}
-	nm_os_free(sna->sk_adapters);
+	bzero(sna->sk_adapters, sizeof(uintptr_t) * sna->sk_adapters_max);
 	sna->sk_adapters_max = 0;
+	nm_os_free(sna->sk_adapters);
 }
 
 static int
@@ -1137,6 +1139,7 @@ nm_st_register_fd(struct netmap_adapter *na, int fd)
 	SOCKBUF_LOCK(&sk->so_rcv);
 	SAVE_DATA_READY(sk, ska);
 	SAVE_DESTRUCTOR(sk, ska);
+	KASSERT(ska->save_sk_destruct == NULL, ("non-NULL default destructor"));
 	ska->na = na;
 	ska->sk = sk;
 	ska->fd = fd;
