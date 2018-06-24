@@ -605,6 +605,7 @@ nm_st_wsk(struct nm_st_sk_adapter *ska, NM_SOCK_T *sk)
 	(sk)->sk_data_ready = (void *)f
 #define SET_DESTRUCTOR(sk, f) \
 	(sk)->sk_destruct = (void *)f
+#define so_dtor sk_destruct
 #define MBUF_HEADLEN(m)		skb_headlen(m) /* m->pkthdr.len in FreeBSD */
 #define MBUF_NETWORK_HEADER(m)		skb_network_header(m)
 #define MBUF_NETWORK_OFFSET(m)		skb_network_offset(m)

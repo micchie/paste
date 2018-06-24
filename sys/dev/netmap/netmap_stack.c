@@ -1044,12 +1044,14 @@ nm_st_sk_destruct(NM_SOCK_T *sk)
 
 	ska = nm_st_sk(sk);
 	ND("socket died first ska %p save_destruct %p", ska, ska ? ska->save_sk_destruct : NULL);
-	if (ska->save_sk_destruct) {
-		ska->save_sk_destruct(sk);
-	}
+	KASSERT(ska->sk == sk, ("inconsistent sk"));
+	KASSERT(NM_NA_VALID(ska->na->ifp), ("invalid na"));
 	sna = (struct netmap_stack_adapter *)ska->na;
 	/* nm_os_st_data_ready() runs bh_lock_sock_nested() */
 	nm_st_unregister_socket(ska);
+	if (sk->so_dtor) {
+		sk->so_dtor(sk);
+	}
 }
 
 /* Under NMG_LOCK() */
