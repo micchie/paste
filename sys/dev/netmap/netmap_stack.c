@@ -770,6 +770,13 @@ nm_st_extra_free(struct netmap_adapter *na)
 			struct nm_st_extra_pool *extra;
 			uint32_t j;
 
+			/* True on do_unregif() after reg failure
+			 * (e.g., for allocating some netmap object
+			 */
+			if (t == NR_RX && i == 0)
+				D("%s %s extra", na->name, kring->nr_mode == NKR_NETMAP_OFF ? "not freeing" : "freeing");
+			if (kring->nr_mode == NKR_NETMAP_OFF)
+				continue;
 			if (!kring->extra)
 				continue;
 			extra = kring->extra;
@@ -1024,7 +1031,6 @@ nm_st_unregister_socket(struct nm_st_sk_adapter *ska)
 	if (ska->fd >= sna->sk_adapters_max) {
 		D("WARNING: non-registered or invalid fd %d", ska->fd);
 	} else {
-		KASSERT(sk->so_dtor != ska->save_sk_destruct, ("bad restore\n"));
 		sna->sk_adapters[ska->fd] = NULL;
 		NM_SOCK_LOCK(sk);
 		SOCKBUF_LOCK(&sk->so_rcv);
@@ -1042,13 +1048,12 @@ static void
 nm_st_sk_destruct(NM_SOCK_T *sk)
 {
 	struct nm_st_sk_adapter *ska;
-	struct netmap_stack_adapter *sna;
+	//struct netmap_stack_adapter *sna;
 
 	ska = nm_st_sk(sk);
 	ND("socket died first ska %p save_destruct %p", ska, ska ? ska->save_sk_destruct : NULL);
 	KASSERT(ska->sk == sk, ("inconsistent sk"));
-	KASSERT(NM_NA_VALID(ska->na->ifp), ("invalid na"));
-	sna = (struct netmap_stack_adapter *)ska->na;
+	//sna = (struct netmap_stack_adapter *)ska->na;
 	/* nm_os_st_data_ready() runs bh_lock_sock_nested() */
 	nm_st_unregister_socket(ska);
 	if (sk->so_dtor) {
