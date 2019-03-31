@@ -616,6 +616,46 @@ nm_start(struct nm_garg *g)
 		snprintf(conf, sizeof(conf), "@conf:rings=%d", g->nthreads);
 		strlcat(g->ifname, conf, sizeof(g->ifname));
 	}
+	if (g->extmem) {
+		char extm[128], kv[32];
+		size_t lim = sizeof(extm);
+
+		snprintf(extm, sizeof(extm), "@extmem:file=%s", g->extmem);
+		lim -= strlen(extm);
+		bzero(kv, sizeof(kv));
+		snprintf(kv, sizeof(kv), ",if-num=%u", IF_OBJTOTAL);
+		if (lim > strlen(kv)) {
+			strlcat(extm, kv, sizeof(extm));
+			lim -= strlen(kv);
+		} else
+			return -EINVAL;
+		bzero(kv, sizeof(kv));
+		snprintf(kv, sizeof(kv), ",ring-num=%u", RING_OBJTOTAL);
+		if (lim > strlen(kv)) {
+			strlcat(extm, kv, sizeof(extm));
+			lim -= strlen(kv);
+		} else
+			return -EINVAL;
+		bzero(kv, sizeof(kv));
+		snprintf(kv, sizeof(kv), "ring-size=%u", RING_OBJSIZE);
+		if (lim > strlen(kv)) {
+			strlcat(extm, kv, sizeof(extm));
+			lim -= strlen(kv);
+		} else
+			return -EINVAL;
+		bzero(kv, sizeof(kv));
+		snprintf(kv, sizeof(kv), "buf-num=%lu",
+				(uint64_t)g->extra_bufs + 320000);
+		if (lim > strlen(kv)) {
+			strlcat(extm, kv, sizeof(extm));
+			lim -= strlen(kv);
+		} else
+			return -EINVAL;
+		D("extm %s", extm);
+		if (strlen(extm) < sizeof(g->ifname) - strlen(g->ifname)) {
+			strlcat(g->ifname, extm, sizeof(g->ifname));
+		}
+	}
 #if 0
 	nm_parse_nmr_config(g->nmr_config, &base_nmd.nr.reg);
 	if (g->extra_bufs) {
