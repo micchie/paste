@@ -108,7 +108,7 @@ struct nm_msg {
 };
 
 struct nm_garg {
-	char ifname[NETMAP_REQ_IFNAMSIZ]; // must be here
+	char ifname[NETMAP_REQ_IFNAMSIZ*2]; // must be here
 	struct nmport_d *nmd;
 	void *(*td_body)(void *);
 	int nthreads;
@@ -637,24 +637,26 @@ nm_start(struct nm_garg *g)
 		} else
 			return -EINVAL;
 		bzero(kv, sizeof(kv));
-		snprintf(kv, sizeof(kv), "ring-size=%u", RING_OBJSIZE);
+		snprintf(kv, sizeof(kv), ",ring-size=%u", RING_OBJSIZE);
 		if (lim > strlen(kv)) {
 			strlcat(extm, kv, sizeof(extm));
 			lim -= strlen(kv);
 		} else
 			return -EINVAL;
 		bzero(kv, sizeof(kv));
-		snprintf(kv, sizeof(kv), "buf-num=%lu",
+		snprintf(kv, sizeof(kv), ",buf-num=%lu",
 				(uint64_t)g->extra_bufs + 320000);
 		if (lim > strlen(kv)) {
 			strlcat(extm, kv, sizeof(extm));
 			lim -= strlen(kv);
 		} else
 			return -EINVAL;
-		D("extm %s", extm);
 		if (strlen(extm) < sizeof(g->ifname) - strlen(g->ifname)) {
 			strlcat(g->ifname, extm, sizeof(g->ifname));
+		} else {
+			D("no space strlen(extm) %lu sizeof(g->ifname) %lu strlen(g->ifname) %lu g->ifname %s extmem %s", strlen(extm), sizeof(g->ifname), strlen(g->ifname), g->ifname, extm);
 		}
+		D("g->ifname w/ extmem %s", g->ifname);
 	}
 #if 0
 	nm_parse_nmr_config(g->nmr_config, &base_nmd.nr.reg);
