@@ -1,4 +1,5 @@
 #CFLAGS += -Werror -Wall -O2 -g -fsanitize=address
+CC=g++
 CFLAGS += -Werror -Wall -O2 -g
 NMLIB = ../../libnetmap/libnetmap.a
 LDFLAGS += $(NMLIB) -lpthread -lm
@@ -17,7 +18,8 @@ OOPT = -DWITH_CLFLUSHOPT -mclflushopt
 # compile phttpd-o only if your CPU supports clflushopt
 #
 #PROG = phttpd phttpd-b phttpd-o phttpd-f
-PROG = phttpd phttpd-b phttpd-f
+#PROG = phttpd phttpd-b phttpd-f
+PROG = phttpd phttpd-f
 
 all: $(PROG)
 
@@ -38,13 +40,13 @@ phttpd-f: phttpd-f.o
 phttpd-f.o: phttpd.c nmlib.h
 	$(CC) $(CFLAGS) $(OPT) $(SOPT) $(FOPT) $(SPATH) -c phttpd.c -o phttpd-f.o $(EXTRA_CFLAGS)
 
-phttpd-b: phttpd-b.o bplus_support.o bplus_impl.o
-	$(CC) $(CFLAGS) -o phttpd-b phttpd-b.o bplus_impl.o bplus_support.o $(LDFLAGS) $(EXTRA_CFLAGS)
-phttpd-b.o: phttpd.c nmlib.h bplus_common.h bplus_support.h
-	$(CC) $(CFLAGS) $(OPT) $(SOPT) $(BOPT) $(SPATH) -c phttpd.c -o phttpd-b.o $(EXTRA_CFLAGS)
-bplus_impl.o: bplus_impl.c
-	$(CC) $(CFLAGS) $(BOPT) -c bplus_impl.c
-bplus_support.o: bplus_support.c
-	$(CC) $(CFLAGS) $(BOPT) -c bplus_support.c
+#phttpd-b: phttpd-b.o bplus_support.o bplus_impl.o
+#	$(CC) $(CFLAGS) -o phttpd-b phttpd-b.o bplus_impl.o bplus_support.o $(LDFLAGS) $(EXTRA_CFLAGS)
+#phttpd-b.o: phttpd.c nmlib.h bplus_common.h bplus_support.h
+#	$(CC) $(CFLAGS) $(OPT) $(SOPT) $(BOPT) $(SPATH) -c phttpd.c -o phttpd-b.o $(EXTRA_CFLAGS)
+#bplus_impl.o: bplus_impl.c
+#	$(CC) $(CFLAGS) $(BOPT) -c bplus_impl.c
+#bplus_support.o: bplus_support.c
+#	$(CC) $(CFLAGS) $(BOPT) -c bplus_support.c
 clean:
 	-@rm -f $(PROG) $(OBJS)

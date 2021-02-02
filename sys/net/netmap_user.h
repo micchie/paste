@@ -998,7 +998,7 @@ nm_close(struct nm_desc *d)
 		close(d->fd);
 	}
 
-	bzero(d, sizeof(*d));
+	//bzero(d, sizeof(*d));
 	free(d);
 	return 0;
 }

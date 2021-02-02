@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#define _GNU_SOURCE
+//#define _GNU_SOURCE
 #include <stdio.h>
 #include <inttypes.h>
 #include <sys/poll.h>
@@ -151,12 +151,12 @@ static uint64_t stat_vnfds;
 
 static int
 copy_to_nm(struct netmap_ring *ring, const char *data,
-		int len, int off0, int off, int fd)
+		u_int len, u_int off0, u_int off, int fd)
 {
 	u_int const tail = ring->tail;
 	u_int cur = ring->cur;
 	u_int copied = 0;
-	const int space = nm_ring_space(ring);
+	const u_int space = nm_ring_space(ring);
 
 	if (unlikely(space * MAX_PAYLOAD < len)) {
 		RD(1, "no space (%d slots)", space);
@@ -167,7 +167,7 @@ copy_to_nm(struct netmap_ring *ring, const char *data,
 		struct netmap_slot *slot = &ring->slot[cur];
 		char *p = NETMAP_BUF_OFFSET(ring, slot) + off0;
 		/* off0 contains some payload */
-		int l = min(MAX_PAYLOAD - (off0 - off), len - copied);
+		u_int l = min(MAX_PAYLOAD - (off0 - off), len - copied);
 
 		if (NETMAP_ROFFSET(ring, slot) == 0) {
 			D("sending with 0 offset! %u %lu %lu", cur, slot->ptr, ring->offset_mask);
@@ -187,7 +187,7 @@ copy_to_nm(struct netmap_ring *ring, const char *data,
 	return len;
 }
 
-static char *HTTPHDR = "HTTP/1.1 200 OK\r\n"
+static char *HTTPHDR = (char *)"HTTP/1.1 200 OK\r\n"
 		 "Connection: keep-alive\r\n"
 		 "Server: Apache/2.2.800\r\n"
 		 "Content-Length: ";
@@ -228,10 +228,10 @@ generate_http(int content_length, char *buf, char *content)
 }
 
 int
-generate_http_nm(int content_length, struct netmap_ring *ring,
-		int off, int fd, char *header, int hlen, char *content)
+generate_http_nm(u_int content_length, struct netmap_ring *ring,
+		u_int off, int fd, char *header, int hlen, char *content)
 {
-	int len, cur = ring->cur;
+	u_int len, cur = ring->cur;
 	struct netmap_slot *slot = &ring->slot[cur];
 	char *p = NETMAP_BUF_OFFSET(ring, slot) + off;
 
@@ -246,7 +246,7 @@ generate_http_nm(int content_length, struct netmap_ring *ring,
 
 #define SKIP_POST	48
 static int
-parse_post(char *post, int *coff, uint64_t *key)
+parse_post(char *post, u_int *coff, uint64_t *key)
 {
 	int clen;
 	char *pp, *p = strstr(post + SKIP_POST, "Content-Length: ");
@@ -491,7 +491,7 @@ nmidx_wal(char *paddr, size_t *pos, size_t dbsiz, struct netmap_slot *slot,
 {
 	uint64_t packed;
 	size_t cur = *pos;
-	int plen = sizeof(packed);
+	size_t plen = sizeof(packed);
 	char *p = paddr;
 
 	/* make log */
@@ -580,7 +580,7 @@ httpreq(const char *p)
 }
 
 static inline void
-leftover(int *fde, const ssize_t len, int *is_leftover, int *thisclen)
+leftover(int *fde, const ssize_t len, int *is_leftover, u_int *thisclen)
 {
 	if (unlikely(*fde <= 0)) {
 		/* XXX OOB message? Just suppress response */
@@ -595,12 +595,12 @@ leftover(int *fde, const ssize_t len, int *is_leftover, int *thisclen)
 		D("still have leftover %d", *fde);
 		*is_leftover = 1;
 	}
-	*thisclen = len;
+	*thisclen = (u_int)len;
 }
 
 static inline void
 leftover_post(int *fde, const ssize_t len, const ssize_t clen,
-		const int coff, int *thisclen, int *is_leftover)
+		const int coff, u_int *thisclen, int *is_leftover)
 {
 	*thisclen = len - coff;
 	if (clen > *thisclen) {
@@ -626,7 +626,7 @@ phttpd_req(char *rxbuf, int fd, int len, struct nm_targ *targ, int *no_ok,
 
 	switch (httpreq(rxbuf)) {
 	uint64_t key;
-	int coff, clen, thisclen;
+	u_int coff, clen, thisclen;
 
 	case NONE:
 		leftover(fde, len, no_ok, &thisclen);
@@ -804,7 +804,7 @@ int phttpd_read(int fd, struct nm_targ *targ)
 
 	if (readmmap) {
 		len = db->size - db->cur - sizeof(uint64_t);
-		if (unlikely(len < db->pgsiz)) {
+		if (unlikely(len < (int)db->pgsiz)) {
 			db->cur = 0;
 			len = db->size - sizeof(uint64_t);
 		}
@@ -1107,7 +1107,7 @@ main(int argc, char **argv)
 
 	/* Preallocate HTTP header */
 	if (pg.httplen) {
-		pg.http = calloc(1, MAX_HTTPLEN);
+		pg.http = (char *)calloc(1, MAX_HTTPLEN);
 		if (!pg.http) {
 			perror("calloc");
 			usage();
