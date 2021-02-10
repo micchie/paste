@@ -1151,10 +1151,10 @@ pst_unregister_socket(struct pst_so_adapter *soa, int locked)
 		NM_SOCK_LOCK(so);
 		SOCKBUF_LOCK(&so->so_rcv);
 		RESTORE_SOUPCALL(so, soa);
-		RESTORE_SODTOR(so, soa);
-		pst_wso(NULL, so);
 		SOCKBUF_UNLOCK(&so->so_rcv);
-		NM_SOCK_UNLOCK(so);
+		//RESTORE_SODTOR(so, soa);
+		pst_wso(NULL, so);
+		sorele(so); // internally SOCK_UNLOCK
 	}
 	nm_os_free(soa);
 	if (!locked)
@@ -1264,10 +1264,11 @@ pst_register_fd(struct netmap_adapter *na, int fd)
 	soa->so = so;
 	soa->fd = fd;
 	SET_SOUPCALL(so, nm_os_pst_upcall);
-	SET_SODTOR(so, pst_sodtor);
+	//SET_SODTOR(so, pst_sodtor);
 	pst_wso(soa, so);
 	sna->so_adapters[fd] = soa;
 	SOCKBUF_UNLOCK(&so->so_rcv);
+	soref(so);
 unlock_return:
 	NM_SOCK_UNLOCK(so);
 	if (!error) {
