@@ -54,13 +54,13 @@
 int paste_host_batch = 1;
 static int paste_extra = 2048;
 int paste_usrrcv = 0;
-int paste_optim_sendpage = 1;
+int paste_optim_sendpage = 0;
 SYSBEGIN(vars_paste);
 SYSCTL_DECL(_dev_netmap);
 SYSCTL_INT(_dev_netmap, OID_AUTO, paste_host_batch, CTLFLAG_RW, &paste_host_batch, 0 , "");
 SYSCTL_INT(_dev_netmap, OID_AUTO, paste_extra, CTLFLAG_RW, &paste_extra, 0 , "");
 SYSCTL_INT(_dev_netmap, OID_AUTO, paste_usrrcv, CTLFLAG_RW, &paste_usrrcv, 1 , "");
-SYSCTL_INT(_dev_netmap, OID_AUTO, paste_optim_sendpage, CTLFLAG_RW, &paste_usrrcv, 1 , "");
+SYSCTL_INT(_dev_netmap, OID_AUTO, paste_optim_sendpage, CTLFLAG_RW, &paste_optim_sendpage, 1 , "");
 SYSEND;
 
 static int netmap_pst_bwrap_intr_notify(struct netmap_kring *kring, int flags);
@@ -207,13 +207,13 @@ pst_bdg_freeable(struct netmap_adapter *na)
 						    t)[j]->extra->refcount);
 					/* where is it? */
 
-					p = NMR(port_na, t)[j]->extra;
-					for (k = p->busy; k != p->busy_tail;) {
-						struct pst_extra_slot *slot;
-						slot = &p->slots[k];
-						nm_prinf("busy extra %u", k);
-						k = slot->next;
-					}
+					//p = NMR(port_na, t)[j]->extra;
+					//for (k = p->busy; k != p->busy_tail;) {
+					//	struct pst_extra_slot *slot;
+					//	slot = &p->slots[k];
+					//	PST_DBG("busy extra %u", k);
+					//	k = slot->next;
+					//}
 					return 0;
 				}
 			}
@@ -810,10 +810,11 @@ netmap_pst_transmit(struct ifnet *ifp, struct mbuf *m)
 	int mismatch;
 	const u_int bufsize = NETMAP_BUF_SIZE(na);
 
-	PST_DBG("m %p len %u proto %x", m, m->len, ntohs(m->protocol));
 #ifdef __FreeBSD__
 	struct mbuf *md = m;
 
+	PST_DBG("m %p len %u proto %x", m, m->m_len,
+		ntohs(*(uint16_t *)(mtod(m, char *)+ETHER_ADDR_LEN*2)));
 	/* M_EXT or multiple mbufs (i.e., chain) */
 	if ((m->m_flags & M_EXT)) // not TCP case
 		cb = NMCB_EXT(m, 0, bufsize);
@@ -825,6 +826,7 @@ netmap_pst_transmit(struct ifnet *ifp, struct mbuf *m)
 		md = m->m_next;
 	}
 #elif defined(linux)
+	PST_DBG("m %p len %u proto %x", m, m->len, ntohs(m->protocol));
 	/* txsync-ing TX packets are always frags */
 	if (!MBUF_NONLINEAR(m)) {
 		csum_transmit(na, m);
@@ -833,7 +835,7 @@ netmap_pst_transmit(struct ifnet *ifp, struct mbuf *m)
 
 	cb = NMCB_EXT(m, 0, bufsize);
 #endif /* __FreeBSD__ */
-	if (!(cb && nmcb_valid(cb))) {
+	if (unlikely(!(cb && nmcb_valid(cb)))) {
 		csum_transmit(na, m);
 		return 0;
 	}
@@ -860,7 +862,7 @@ netmap_pst_transmit(struct ifnet *ifp, struct mbuf *m)
 
 	slot = nmcb_slot(cb);
 	nmb = NMB(na, slot);
-	if (unlikely(nmb != cb)) {
+	if (unlikely((struct nmcb *)nmb != cb)) {
 		panic("nmb %p cb %p", nmb, cb);
 	}
 	/* bring protocol headers in */
@@ -1229,7 +1231,7 @@ pst_unregister_socket(struct pst_so_adapter *soa)
 	NM_SOCK_T *so = soa->so;
 	struct netmap_pst_adapter *sna = tosna(soa->na);
 
-	nm_prdis("so %p soa %p fd %d", so, soa, soa->fd);
+	//nm_prinf("so %p soa %p fd %d", so, soa, soa->fd);
 	if (!sna) {
 		panic("no sna");
 	}
@@ -1237,7 +1239,9 @@ pst_unregister_socket(struct pst_so_adapter *soa)
 		panic("non-registered or invalid fd %d", soa->fd);
 	sna->so_adapters[soa->fd] = NULL;
 	sna->num_so_adapters--;
+	nm_prinf("so %p soa %p fd %d", so, soa, soa->fd);
 	NM_SOCK_LOCK(so);
+	nm_prinf("so %p locked", so);
 	SOCKBUF_LOCK(&so->so_rcv);
 	RESTORE_SOUPCALL(so, soa);
 	RESTORE_SODTOR(so, soa);
@@ -1368,7 +1372,6 @@ pst_register_fd(struct netmap_adapter *na, int fd)
 	sna->num_so_adapters++;
 	SOCKBUF_UNLOCK(&so->so_rcv);
 unlock_return:
-	//mtx_unlock(&sna->so_adapters_lock);
 	if (!error) {
 		error = nm_os_pst_sbdrain(na, so);
 	}
