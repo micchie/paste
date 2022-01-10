@@ -1334,7 +1334,7 @@ netmap_pst_reg(struct netmap_adapter *na, int onoff)
 		if (na->active_fds > 0)
 			goto vp_reg;
 
-	       	pna = (struct netmap_pst_adapter *)na;
+		pna = (struct netmap_pst_adapter *)na;
 		if (netmap_verbose)
 			nm_prinf("%s active_fds %d num_so_adapters %d",
 				na->name, na->active_fds, pna->num_so_adapters);
