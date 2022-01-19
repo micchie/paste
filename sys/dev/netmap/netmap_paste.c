@@ -241,8 +241,8 @@ pst_extra_deq(struct netmap_kring *kring, struct netmap_slot *slot)
 	slots = pool->slots;
 	/* nothing to do if I am on the ring */
 	if (unlikely(!(BETWEEN(slot, slots, pool->num)))) {
-		PST_DBG_LIM("%s kring %u buf_idx %u not in the extra pool",
-				kring->na->name, kring->ring_id, slot->buf_idx);
+		PST_DBG_LIM("%s kring %s buf_idx %u not in the extra pool",
+				kring->na->name, kring->name, slot->buf_idx);
 		return;
 	}
 
@@ -743,9 +743,9 @@ netmap_pst_transmit(struct ifnet *ifp, struct mbuf *m)
 	    || unlikely(kring && kring->na->na_private == na->na_private)
 #endif /* __FreeBSD__ */
 	    ) {
-		PST_DBG_LIM("cb %p %s len %u", cb,
-		    nmcb_rstate(cb) == MB_QUEUED ? "MB_QUEUED" : "!MB_STACK",
-		    MBUF_LEN(m));
+		if (netmap_verbose)
+			nm_prlim(1, "cb %p state %d len %u", cb,
+				nmcb_rstate(cb), MBUF_LEN(m));
 #ifdef linux
 		if (unlikely(nmcb_rstate(cb) == MB_QUEUED)) {
 			nmcb_wstate(NMCB_EXT(m, 0, bufsize), MB_NOREF);
