@@ -234,8 +234,8 @@ pst_extra_deq(struct netmap_kring *kring, struct netmap_slot *slot)
 
 	/* XXX raising mbuf might have been orphaned */
 	if (netmap_debug) {
-		if (kring == NULL || kring->nr_mode != NKR_NETMAP_ON)
-			panic("kring NULL or off");
+		if (kring->nr_mode != NKR_NETMAP_ON)
+			panic("kring off");
 	}
 	pool = kring->extra;
 	slots = pool->slots;
@@ -725,9 +725,6 @@ netmap_pst_transmit(struct ifnet *ifp, struct mbuf *m)
 
 	cb = NMCB_EXT(m, 0, bufsize);
 #endif /* __FreeBSD__ */
-	/*
-	 * FreeBSD pushes down the same cb multiple times for different slots
-	 */
 	if (unlikely(!(cb && nmcb_valid(cb)))) {
 		csum_transmit(na, m);
 		return 0;
@@ -739,7 +736,7 @@ netmap_pst_transmit(struct ifnet *ifp, struct mbuf *m)
 	 */
 	if (unlikely(nmcb_rstate(cb) != MB_STACK)
 #ifdef __FreeBSD__
-	    /* FreeBSD ARP reply recycles the request mbuf */
+	    /* FreeBSD ARP reply recycles the RX mbuf */
 	    || unlikely(kring && kring->na->na_private == na->na_private)
 #endif /* __FreeBSD__ */
 	    ) {
@@ -768,7 +765,6 @@ netmap_pst_transmit(struct ifnet *ifp, struct mbuf *m)
 	poff = nm_get_offset(kring, slot);
 	doff = nm_pst_getdoff(slot);
 	hole = (int)doff - MBUF_HDRLEN(m);
-
 	if (!hole) {
 		/* bring headers in */
 		memcpy(nmb + poff, MBUF_DATA(m), doff);
@@ -1179,6 +1175,7 @@ pst_mbuf_data_dtor(struct nmcb *cb)
 	}
 	pst_put_extra_ref(nmcb_kring(cb));
 	if (nmcb_rstate(cb) != MB_FTREF) {
+		/* consumed RX mbuf just bounces as not in extra pool */
 		pst_extra_deq(nmcb_kring(cb), nmcb_slot(cb));
 		nmcb_wstate(cb, MB_NOREF);
 	}
