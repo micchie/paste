@@ -546,7 +546,8 @@ nm_start(struct nm_garg *g)
 			return -EINVAL;
 		}
 		g->extra_bufs = buf_avail - need_rings * need_rings_bufs;
-		D("extmem_siz %lu need_ifs %lu need_rings %lu buf_avail %lu need_ring_bufs %lu extra_bufs %u",
+		D("extmem_siz %lu need_ifs %lu need_rings %lu buf_avail %lu "
+		  "need_ring_bufs %lu extra_bufs %u",
 				g->extmem_siz,
 				need_ifs, need_rings, buf_avail,
 				need_rings_bufs,
