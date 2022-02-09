@@ -541,7 +541,7 @@ SYSBEGIN(main_init);
 
 SYSCTL_DECL(_dev_netmap);
 SYSCTL_NODE(_dev, OID_AUTO, netmap, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
-    "Netmap args");
+		"Netmap args");
 SYSCTL_INT(_dev_netmap, OID_AUTO, verbose,
 		CTLFLAG_RW, &netmap_verbose, 0, "Verbose mode");
 #ifdef CONFIG_NETMAP_DEBUG
@@ -2662,7 +2662,7 @@ netmap_do_regif(struct netmap_priv_d *priv, struct netmap_adapter *na,
 	 */
 	netmap_update_hostrings_mode(na);
 
-	if (nm_kring_pending(priv)) {
+	if (na->active_fds == 0 || nm_kring_pending(priv)) {
 		/* Some kring is switching mode, tell the adapter to
 		 * react on this. */
 		netmap_set_all_rings(na, NM_KR_LOCKED);
