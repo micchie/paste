@@ -669,6 +669,8 @@ mbuf_proto_headers(struct mbuf *m)
 static void
 csum_transmit(struct netmap_adapter *na, struct mbuf *m)
 {
+	if (MBUF_HASNEXT(m))
+		MBUF_FLATTEN(m);
 	if (nm_os_mbuf_has_csum_offld(m)) {
 		struct nm_iphdr *iph;
 		char *th;
@@ -676,6 +678,7 @@ csum_transmit(struct netmap_adapter *na, struct mbuf *m)
 		mbuf_proto_headers(m);
 		iph = (struct nm_iphdr *)MBUF_L3_HEADER(m);
 		th = MBUF_L4_HEADER(m);
+		MBUF_CSUM_DONE(m);
 		if (iph->protocol == IPPROTO_UDP)
 			check = &((struct nm_udphdr *)th)->check;
 		else if (likely(iph->protocol == IPPROTO_TCP))
@@ -749,7 +752,6 @@ netmap_pst_transmit(struct ifnet *ifp, struct mbuf *m)
 			pst_extra_deq(kring, nmcb_slot(cb));
 		}
 #endif
-		MBUF_FLATTEN(m); // XXX
 		csum_transmit(na, m);
 		return 0;
 	}

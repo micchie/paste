@@ -1164,7 +1164,7 @@ nm_os_pst_upcall(NM_SOCK_T *sk)
 		int queued = 0;
 
 		if (unlikely(!nmcb_valid(cb))) {
-			panic("invalid cb");
+			panic("cb not associated with a netmap interface");
 		}
 		if (!kring) {
 			kring = nmcb_kring(cb);

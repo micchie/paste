@@ -34,7 +34,7 @@ extern "C" {
 	printf(""fmt"\n", ##__VA_ARGS__)
 #endif
 
-int normalize = 1;
+#define normalize 1
 
 #define EPOLLEVENTS 2048
 #define DEBUG_SOCKET	1
@@ -536,7 +536,7 @@ nm_start(struct nm_garg *g)
 		need_rings = 12 * g->nthreads;
 		need_rings_space = (g->ring_objsize+64) * need_rings;
 		need_rings_bufs = (g->ring_objsize+64)/sizeof(struct netmap_slot);
-		need_ifs = g->nthreads * 2;
+		need_ifs = g->nthreads * 2 + 2; // extra 2 for kwait
 		need_ifs_space = (sizeof(struct netmap_if)+64) * need_ifs;
 		buf_space = g->extmem_siz - need_rings_space - need_ifs_space;
 		buf_avail = buf_space / 2048;
@@ -1345,7 +1345,7 @@ netmap_eventloop(const char *name, char *ifname, void **ret, int *error,
  * is written after `off0` bytes. This is useful when the caller writes
  * an app-level header beforehand
  */
-const u_int DEFAULT_MTU = 1520; // maximum option space
+#define DEFAULT_MTU 1520 // maximum option space
 static inline int
 nm_write(struct netmap_ring *ring, const char *data,
 		size_t len, u_int off0, int fd)
