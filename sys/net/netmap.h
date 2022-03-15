@@ -220,6 +220,7 @@ struct netmap_slot {
 	 */
 
 #define NS_TXMON	0x0040
+#define NS_CSUM         0x0080
 	/* (monitor ports only) the packet comes from the TX
 	 * ring of the monitored port
 	 */
