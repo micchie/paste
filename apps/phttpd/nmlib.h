@@ -18,7 +18,7 @@
 #include <linux/sysctl.h>	/* sysctl */
 #include <netinet/tcp.h>	/* SOL_TCP */
 #include <sys/epoll.h>
-#include <bsd/string.h>
+//#include <bsd/string.h>
 #endif /* __linux__ */
 
 #ifdef __cplusplus

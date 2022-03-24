@@ -1,5 +1,5 @@
 #CFLAGS += -Werror -Wall -O2 -g -fsanitize=address
-CFLAGS += -Werror -Wall -O2 -g
+CFLAGS += -Werror -Wall -O2 -g -Wno-cpp
 NMLIB = ../../libnetmap/libnetmap.a
 LSMLIB = ../../../lsm_nvm
 NOCFLAGS := $(CFLAGS)
@@ -8,7 +8,9 @@ NOCFLAGS += -DNOLIBNETMAP -DLIBNETMAP_NOTHREADSAFE
 LDFLAGS += -lpthread -lm
 UNAME := $(shell uname)
 ifeq ($(UNAME), Linux)
+ifeq "$(findstring musl, $(CC))" ""
 LDFLAGS += -lbsd
+endif
 CC = gcc
 else
 CC = clang
